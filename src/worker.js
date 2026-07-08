@@ -32,8 +32,8 @@ const ESPN = SITE; // alias kept so the v1 handlers below stay byte-identical
 // ============================================================================
 
 // Edge-cache an upstream GET for `ttl` seconds.
-const cachedFetch = (url, ttl) =>
-  fetch(url, { cf: { cacheTtl: ttl, cacheEverything: true } });
+const cachedFetch = (url, ttl, headers) =>
+  fetch(url, { headers, cf: { cacheTtl: ttl, cacheEverything: true } });
 
 // JSON response with CORS + client cache-control mirroring the endpoint TTL.
 const json = (obj, ttl = 30, status = 200) =>
@@ -47,8 +47,8 @@ const json = (obj, ttl = 30, status = 200) =>
   });
 
 // Edge-cached GET that parses JSON and throws (carrying the upstream status) on !ok.
-async function fetchJSON(url, ttl) {
-  const r = await cachedFetch(url, ttl);
+async function fetchJSON(url, ttl, headers) {
+  const r = await cachedFetch(url, ttl, headers);
   if (!r.ok) {
     const e = new Error('upstream ' + r.status);
     e.upstreamStatus = r.status;
@@ -602,9 +602,11 @@ const KALSHI_SERIES = ['KXMENWORLDCUP', 'KXWCGAME', 'KXWCADVANCE'];
 // status=open on the event keeps only live markets; eliminated teams inside
 // an open event surface as finalized markets, hence the per-market filter.
 async function kalshiSeries(seriesTicker) {
+  // Kalshi's WAF rejects UA-less requests (Workers fetch sends no default UA).
   const d = await fetchJSON(
     `${KALSHI}/events?series_ticker=${seriesTicker}&with_nested_markets=true&status=open`,
-    60
+    60,
+    { accept: 'application/json', 'user-agent': 'wc2026-board/1.0 (+https://wc2026.ratnani.org)' }
   );
   return (d.events || [])
     .map(ev => {
