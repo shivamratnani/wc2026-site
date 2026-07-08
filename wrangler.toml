@@ -1,0 +1,17 @@
+name = "wc2026"
+main = "src/worker.js"
+compatibility_date = "2026-06-01"
+account_id = "b64c7c66170425db251eacdb4e3286da"
+
+# Custom domain — requires ratnani.org zone on this Cloudflare account
+routes = [
+  { pattern = "wc2026.ratnani.org", custom_domain = true }
+]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+# Optional: enables /api/markets (odds + Messi props via Anthropic web search)
+# Set with: npx wrangler secret put ANTHROPIC_API_KEY
