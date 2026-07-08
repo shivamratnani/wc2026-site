@@ -1,5 +1,5 @@
 // views/match.js — single match detail. Sections fail independently.
-import { fetchJSON, Poller } from '../api.js';
+import { fetchJSON, Poller, getAliveMaps, isDead } from '../api.js';
 import { esc, fmtDateTime, minuteBadge, resultChip } from '../format.js';
 import { panelHead, oddsCell, twoSidedBar, inlineNote, liveDot } from './_shared.js';
 
@@ -36,6 +36,8 @@ export function mount(root, params) {
   let live = false;
   let firstLoad = true;
   let propsMounted = false;
+  let aliveMaps = null;
+  let lastMatch = null;
 
   async function load() {
     const [mRes, oRes, pRes] = await Promise.allSettled([
@@ -46,8 +48,9 @@ export function mount(root, params) {
 
     if (mRes.status === 'fulfilled' && mRes.value) {
       const d = mRes.value;
+      lastMatch = d;
       live = d.state === 'in';
-      renderHeader(d);
+      renderHeader(d, aliveMaps);
       renderTimeline(d);
       renderTeamStats(d);
       renderLineups(d);
@@ -59,6 +62,12 @@ export function mount(root, params) {
     renderBetting(oRes, pRes);
     firstLoad = false;
     if (poller) poller.setInterval(live ? 15000 : 0);
+  }
+
+  // Team life status loads once and re-renders the header when it arrives.
+  async function loadAlive() {
+    aliveMaps = await getAliveMaps();
+    if (lastMatch) renderHeader(lastMatch, aliveMaps);
   }
 
   function renderBetting(oRes, pRes) {
@@ -86,6 +95,7 @@ export function mount(root, params) {
 
   poller = new Poller(load, 15000);
   poller.start();
+  loadAlive();
   return { destroy() { poller.stop(); } };
 }
 
@@ -100,7 +110,7 @@ function headerSkeleton() {
     </div>`;
 }
 
-function renderHeader(d) {
+function renderHeader(d, aliveMaps) {
   const el = document.getElementById('sec-header');
   if (!el) return;
   const h = d.header || {};
@@ -109,6 +119,14 @@ function renderHeader(d) {
   const isLive = d.state === 'in';
   const isPost = d.state === 'post';
   const showScore = isLive || isPost;
+
+  // On a finished match, mark the side that has since been eliminated.
+  const elimNote = (side) => {
+    if (!isPost) return '';
+    return isDead(aliveMaps, { teamId: side.id, abbr: side.abbr, name: side.team })
+      ? `<div class="elim-note">eliminated</div>`
+      : '';
+  };
 
   let badge;
   if (isLive) badge = `<span class="tag tag-live">${liveDot()}${esc(h.detail || 'Live')}</span>`;
@@ -130,11 +148,13 @@ function renderHeader(d) {
       <div class="mh-team">
         <div class="mh-name">${esc(home.team || 'TBD')}</div>
         <div class="mh-form">${formStrip((d.form || {}).home)}</div>
+        ${elimNote(home)}
       </div>
       <div class="mh-mid">${mid}${pens}</div>
       <div class="mh-team">
         <div class="mh-name">${esc(away.team || 'TBD')}</div>
         <div class="mh-form">${formStrip((d.form || {}).away)}</div>
+        ${elimNote(away)}
       </div>
     </div>
     ${venueBits.length ? `<div class="mh-venue micro muted">${venueBits.join(' · ')}</div>` : ''}`;

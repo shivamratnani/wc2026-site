@@ -77,3 +77,25 @@ async function updateChip() {
 
 const chipPoller = new Poller(updateChip, 60000);
 chipPoller.start();
+
+// ---- theme toggle (dark is default; persists in localStorage) -----
+
+(function initTheme() {
+  const toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+
+  const current = () => (document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+  const label = () => {
+    toggle.setAttribute('aria-label', current() === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+  };
+
+  toggle.addEventListener('click', () => {
+    const next = current() === 'light' ? 'dark' : 'light';
+    if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('wc26-theme', next); } catch (_) { /* private mode */ }
+    label();
+  });
+
+  label();
+})();

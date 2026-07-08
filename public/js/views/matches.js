@@ -42,10 +42,13 @@ export function mount(root) {
     const live = matches.filter((m) => m.state === 'in');
     const pre = matches.filter((m) => m.state === 'pre');
     const post = matches.filter((m) => m.state === 'post');
+    const today = pre.filter((m) => isToday(m.date));
+    const upcoming = pre.filter((m) => !isToday(m.date));
 
     let html = '';
     if (live.length) html += section('Live now', live);
-    if (pre.length) html += section('Today & upcoming', pre);
+    if (today.length) html += section('Today', today);
+    if (upcoming.length) html += section('Upcoming', upcoming);
     if (post.length) html += section('Recent results', post);
     body.innerHTML = html;
   }
@@ -53,6 +56,14 @@ export function mount(root) {
   poller = new Poller(load, 300000);
   poller.start();
   return { destroy() { poller.stop(); } };
+}
+
+// True when an ISO kickoff falls on the viewer's local calendar day.
+function isToday(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
 
 function section(title, list) {

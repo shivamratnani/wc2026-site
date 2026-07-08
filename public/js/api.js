@@ -136,3 +136,46 @@ export async function resolveAthletes(ids) {
 export function cachedAthlete(id) {
   return _athleteCache.get(String(id)) || null;
 }
+
+// getAliveMaps: resolve /api/alive into lookup maps keyed by id, abbr, and
+// name. Memoized with a short TTL so each view refetch is cheap but stays
+// current. On failure returns empty maps (nothing gets flagged dead).
+let _aliveCache = null;
+let _aliveAt = 0;
+
+export async function getAliveMaps(maxAge = 60000) {
+  const now = Date.now();
+  if (_aliveCache && now - _aliveAt < maxAge) return _aliveCache;
+  try {
+    const d = await fetchJSON('/api/alive', { timeout: 8000 });
+    const byId = new Map();
+    const byAbbr = new Map();
+    const byName = new Map();
+    for (const t of (d && d.teams) || []) {
+      if (t.id != null) byId.set(String(t.id), t);
+      if (t.abbr) byAbbr.set(String(t.abbr).toUpperCase(), t);
+      if (t.name) byName.set(String(t.name).toLowerCase(), t);
+    }
+    _aliveCache = { byId, byAbbr, byName };
+    _aliveAt = now;
+  } catch (_) {
+    if (!_aliveCache) _aliveCache = { byId: new Map(), byAbbr: new Map(), byName: new Map() };
+  }
+  return _aliveCache;
+}
+
+// lookupTeam: find an alive-team record by id, abbr, or name (first hit wins).
+export function lookupTeam(maps, { teamId, abbr, name } = {}) {
+  if (!maps) return null;
+  if (teamId != null && maps.byId.has(String(teamId))) return maps.byId.get(String(teamId));
+  if (abbr && maps.byAbbr.has(String(abbr).toUpperCase())) return maps.byAbbr.get(String(abbr).toUpperCase());
+  if (name && maps.byName.has(String(name).toLowerCase())) return maps.byName.get(String(name).toLowerCase());
+  return null;
+}
+
+// isDead: true only when a matched team is explicitly eliminated. Unknown
+// teams are treated as alive so nothing is dimmed on missing data.
+export function isDead(maps, keys) {
+  const t = lookupTeam(maps, keys);
+  return !!t && t.alive === false;
+}

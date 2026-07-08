@@ -1,7 +1,7 @@
 // views/groups.js — group-stage standings.
-import { fetchJSON, Poller } from '../api.js';
+import { fetchJSON, Poller, getAliveMaps, isDead } from '../api.js';
 import { esc } from '../format.js';
-import { errorState, emptyState } from './_shared.js';
+import { errorState, emptyState, tag } from './_shared.js';
 
 export function mount(root) {
   root.innerHTML = `<div class="view view-groups"><div class="wrap">
@@ -17,8 +17,9 @@ export function mount(root) {
 
   async function load() {
     let data;
+    let alive = null;
     try {
-      data = await fetchJSON('/api/standings');
+      [data, alive] = await Promise.all([fetchJSON('/api/standings'), getAliveMaps()]);
     } catch (e) {
       if (!body.querySelector('.group-card')) {
         errorState(body, { title: 'Standings unavailable', note: e.message, onRetry: load });
@@ -30,7 +31,7 @@ export function mount(root) {
       emptyState(body, { title: 'No standings yet', note: 'Tables populate once group play begins.' });
       return;
     }
-    body.innerHTML = `<div class="grid grid-groups">${groups.map(groupCard).join('')}</div>`;
+    body.innerHTML = `<div class="grid grid-groups">${groups.map((g) => groupCard(g, alive)).join('')}</div>`;
   }
 
   poller = new Poller(load, 300000);
@@ -58,11 +59,14 @@ function fmtGD(v) {
   return n > 0 ? '+' + n : String(n);
 }
 
-function groupCard(g) {
+function groupCard(g, alive) {
   const name = /group/i.test(g.name || '') ? g.name : 'Group ' + (g.name || '');
-  const rows = (g.entries || []).map((e, i) => `<tr class="${e.advanced ? 'is-adv' : ''}">
+  const rows = (g.entries || []).map((e, i) => {
+    const dead = isDead(alive, { teamId: e.teamId, abbr: e.abbr, name: e.team });
+    const cls = [e.advanced ? 'is-adv' : '', dead ? 'row-out' : ''].filter(Boolean).join(' ');
+    return `<tr class="${cls}">
     <td class="r mono rank">${esc(e.rank ?? i + 1)}</td>
-    <td class="l team"><span class="team-cell">${e.logo ? `<img class="logo" src="${esc(e.logo)}" alt="" loading="lazy" width="18" height="18">` : '<span class="logo logo-ph" aria-hidden="true"></span>'}<span class="tname">${esc(e.team || e.abbr || '')}</span></span></td>
+    <td class="l team"><span class="team-cell">${e.logo ? `<img class="logo" src="${esc(e.logo)}" alt="" loading="lazy" width="18" height="18">` : '<span class="logo logo-ph" aria-hidden="true"></span>'}<span class="tname">${esc(e.team || e.abbr || '')}</span>${dead ? ' ' + tag('out', 'out') : ''}</span></td>
     <td class="r mono">${num(e.played)}</td>
     <td class="r mono">${num(e.wins)}</td>
     <td class="r mono">${num(e.draws)}</td>
@@ -71,7 +75,8 @@ function groupCard(g) {
     <td class="r mono">${num(e.ga)}</td>
     <td class="r mono gd">${fmtGD(e.gd)}</td>
     <td class="r mono pts">${num(e.points)}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 
   return `<div class="group-card card">
     <div class="group-title"><span class="gt-name">${esc(name)}</span></div>

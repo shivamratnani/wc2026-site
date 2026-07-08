@@ -103,7 +103,7 @@ export function mount(root) {
       predEl.innerHTML = inlineNote('Prediction markets connecting soon.');
       return;
     }
-    const src = data.source ? `<div class="pred-src micro muted">Source: ${esc(data.source)}</div>` : '';
+    const src = `<div class="pred-src micro muted">${esc(sourceLabel(data.source))}</div>`;
     predEl.innerHTML = src + `<div class="grid grid-pred">${markets.map(predCard).join('')}</div>`;
   }
 
@@ -179,4 +179,11 @@ function fmtVolume(v) {
   if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
   if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
   return String(n);
+}
+
+// "kalshi" -> "Data via Kalshi", "polymarket" -> "Data via Polymarket".
+function sourceLabel(src) {
+  const s = String(src || '').trim();
+  if (!s) return '';
+  return 'Data via ' + s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }

@@ -13,7 +13,8 @@
 //   GET /api/props?id=EVENTID   DraftKings player prop bets, grouped by type
 //   GET /api/leaders            tournament stat leaders (goals, assists, saves, ...)
 //   GET /api/athletes?ids=1,2   batch athlete resolver (name/jersey/pos/team)
-//   GET /api/predictions        Kalshi prediction markets (winner, match ML, advancement)
+//   GET /api/alive              team life status (advanced from group, not yet knocked out)
+//   GET /api/predictions        prediction markets (Kalshi, Polymarket fallback)
 //   GET /api/markets            Anthropic web-search futures/boot odds
 //
 // One file by deployment constraint. Workers runtime provides fetch/caches/Response.
@@ -590,23 +591,62 @@ async function apiAthletes(idsParam) {
 }
 
 // ============================================================================
+// GET /api/alive — tournament life status per team
+// Dead = failed to advance from the group, or lost a completed knockout tie.
+// ============================================================================
+
+async function apiAlive() {
+  const [standings, knockouts] = await Promise.all([
+    fetchJSON(`${SITE2}/standings`, 300),
+    fetchJSON(`${SITE}/scoreboard?dates=20260625-20260731`, 300), // full knockout window
+  ]);
+
+  const teams = new Map();
+  for (const ch of standings.children || []) {
+    for (const e of ch.standings?.entries || []) {
+      const t = e.team || {};
+      if (!t.id) continue;
+      const advanced = !!Number((e.stats || []).find(s => s.name === 'advanced')?.value);
+      teams.set(t.id, { id: t.id, abbr: t.abbreviation ?? null, name: t.displayName ?? null, alive: advanced });
+    }
+  }
+  for (const ev of knockouts.events || []) {
+    if (ev.status?.type?.state !== 'post') continue;
+    // The date window can catch late group-stage matchdays — a group loss is not elimination.
+    if (String(ev.season?.slug || '').includes('group')) continue;
+    for (const c of (ev.competitions?.[0] || {}).competitors || []) {
+      const rec = c.team?.id && teams.get(c.team.id);
+      if (rec && c.winner === false) rec.alive = false;
+    }
+  }
+  return json({ updatedAt: new Date().toISOString(), teams: [...teams.values()] }, 300);
+}
+
+// ============================================================================
 // GET /api/predictions — Kalshi prediction markets (keyless public reads)
 // Winner futures, per-match regulation-time moneylines, R16 advancement.
 // ============================================================================
 
 const KALSHI = 'https://api.elections.kalshi.com/trade-api/v2';
 const KALSHI_SERIES = ['KXMENWORLDCUP', 'KXWCGAME', 'KXWCADVANCE'];
+const POLYMARKET = 'https://gamma-api.polymarket.com';
+const POLYMARKET_SLUGS = [
+  'world-cup-winner',
+  'world-cup-nation-to-reach-semifinals',
+  'which-continent-will-win-the-world-cup',
+];
+// Prediction-market hosts reject UA-less requests (Workers fetch sends no default UA).
+const PM_HEADERS = { accept: 'application/json', 'user-agent': 'wc2026-board/1.0 (+https://wc2026.ratnani.org)' };
 
 // One Kalshi series -> contract markets. Uses the *_dollars fields (0..1
 // floats) — the legacy integer fields (last_price, yes_bid, ...) are null.
 // status=open on the event keeps only live markets; eliminated teams inside
 // an open event surface as finalized markets, hence the per-market filter.
 async function kalshiSeries(seriesTicker) {
-  // Kalshi's WAF rejects UA-less requests (Workers fetch sends no default UA).
   const d = await fetchJSON(
     `${KALSHI}/events?series_ticker=${seriesTicker}&with_nested_markets=true&status=open`,
     60,
-    { accept: 'application/json', 'user-agent': 'wc2026-board/1.0 (+https://wc2026.ratnani.org)' }
+    PM_HEADERS
   );
   return (d.events || [])
     .map(ev => {
@@ -631,16 +671,78 @@ async function kalshiSeries(seriesTicker) {
     .filter(m => m.outcomes.length);
 }
 
-// Series fetched in parallel; one failing series never blanks the panel.
-async function fetchPredictions() {
-  const settled = await Promise.allSettled(KALSHI_SERIES.map(kalshiSeries));
-  const markets = settled.flatMap(s => (s.status === 'fulfilled' ? s.value : []));
-  return { source: markets.length ? 'kalshi' : null, markets };
+// One Polymarket Gamma slug -> contract markets. outcomePrices is a
+// stringified JSON array; closed (eliminated) markets stay in the event.
+async function polymarketSlug(slug) {
+  const evs = await fetchJSON(`${POLYMARKET}/events?slug=${slug}`, 60, PM_HEADERS);
+  return (evs || [])
+    .map(ev => {
+      const outcomes = (ev.markets || [])
+        .filter(m => m.closed === false)
+        .map(m => {
+          let prob = 0;
+          try { prob = Number(JSON.parse(m.outcomePrices || '[]')[0]) || 0; } catch { /* keep 0 */ }
+          return { name: m.groupItemTitle || m.question || '', prob };
+        })
+        .filter(o => o.prob > 0)
+        .sort((a, b) => b.prob - a.prob);
+      return {
+        question: ev.title,
+        outcomes,
+        volume: Math.round(Number(ev.volume) || 0),
+        url: `https://polymarket.com/event/${ev.slug || slug}`,
+      };
+    })
+    .filter(m => m.outcomes.length);
 }
 
-async function apiPredictions() {
+// Kalshi is richer (winner + per-match + advancement) but rate-limits shared
+// Worker egress IPs (intermittent 429s / empty results), so both providers are
+// fetched in parallel and merged: Kalshi markets win, Polymarket fills gaps —
+// its winner event is dropped only when Kalshi's own came through.
+async function fetchPredictions() {
+  const collect = async (keys, fn) => {
+    const settled = await Promise.allSettled(keys.map(fn));
+    return {
+      markets: settled.flatMap(s => (s.status === 'fulfilled' ? s.value : [])),
+      errors: settled
+        .map((s, i) => (s.status === 'rejected' ? `${keys[i]}: ${s.reason?.message || s.reason}` : null))
+        .filter(Boolean),
+    };
+  };
+  const [kalshi, poly] = await Promise.all([
+    collect(KALSHI_SERIES, kalshiSeries),
+    collect(POLYMARKET_SLUGS, polymarketSlug),
+  ]);
+  const isWinner = m => /world cup winner/i.test(m.question);
+  const polyKept = poly.markets.filter(m => !(isWinner(m) && kalshi.markets.some(isWinner)));
+  const markets = [...kalshi.markets, ...polyKept].sort((a, b) => (isWinner(a) ? 0 : 1) - (isWinner(b) ? 0 : 1));
+  const source =
+    [kalshi.markets.length && 'kalshi', polyKept.length && 'polymarket'].filter(Boolean).join(' + ') || null;
+  const errors = [...kalshi.errors, ...poly.errors];
+  return { source, markets, errors: errors.length ? errors : undefined };
+}
+
+async function apiPredictions(debug) {
+  if (debug) {
+    // Ops probe (?debug=1): raw status + first bytes of each provider, no transform.
+    // Kept because Kalshi's Worker-egress behavior is erratic (429s, geo-empties).
+    const probe = async url => {
+      try {
+        const r = await fetch(url, { headers: PM_HEADERS });
+        return { status: r.status, body: (await r.text()).slice(0, 300) };
+      } catch (e) {
+        return { error: String(e).slice(0, 200) };
+      }
+    };
+    const [k, pm] = await Promise.all([
+      probe(`${KALSHI}/events?series_ticker=KXMENWORLDCUP&with_nested_markets=true&status=open`),
+      probe(`${POLYMARKET}/events?slug=world-cup-winner`),
+    ]);
+    return json({ kalshi: k, polymarket: pm }, 5);
+  }
   const p = await fetchPredictions();
-  return json({ updatedAt: new Date().toISOString(), source: p.source, markets: p.markets }, 60);
+  return json({ updatedAt: new Date().toISOString(), source: p.source, markets: p.markets, errors: p.errors }, 60);
 }
 
 // ============================================================================
@@ -656,7 +758,8 @@ const routes = {
   '/api/props': p => apiProps(p.get('id')),
   '/api/leaders': () => apiLeaders(),
   '/api/athletes': p => apiAthletes(p.get('ids')),
-  '/api/predictions': () => apiPredictions(),
+  '/api/alive': () => apiAlive(),
+  '/api/predictions': p => apiPredictions(p.get('debug')),
   '/api/markets': (p, env, ctx) => apiMarkets(env, ctx),
 };
 

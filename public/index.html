@@ -5,8 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WC26 · Live board — wc2026.ratnani.org</title>
 <meta name="description" content="A live FIFA World Cup 2026 board — scores, group standings, tournament leaders, and betting markets. Editorial, fast, no fuss.">
-<meta name="theme-color" content="#fbf7f8">
-<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#121014">
+<meta name="color-scheme" content="dark light">
+
+<!-- Apply saved theme before first paint (dark is default; no FOUC on light). -->
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('wc26-theme') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    } catch (e) {}
+  })();
+</script>
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="wc2026.ratnani.org">
@@ -41,6 +52,10 @@
     <span class="status-chip" id="status-chip" aria-live="polite" aria-label="Live status">
       <span class="idle-dot" aria-hidden="true"></span><span class="sc-txt mono">connecting</span>
     </span>
+    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.4"/><path d="M12 1.8v2.4M12 19.8v2.4M1.8 12h2.4M19.8 12h2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M19.2 4.8l-1.7 1.7M6.5 17.5l-1.7 1.7"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.2 6.2 0 0 0 10.5 10.5z"/></svg>
+    </button>
   </div>
 </nav>
 

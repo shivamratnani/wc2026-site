@@ -7,20 +7,27 @@
    ================================================================= */
 
 /* ---- 1. tokens --------------------------------------------------- */
+/* Dark is the DEFAULT theme (owner's call — no prefers-color-scheme).
+   Light values live under [data-theme="light"]. Colors are theme-scoped;
+   sizing/motion/font tokens are shared and stay in :root. */
 :root {
-  --paper: #ffffff;
-  --paper-warm: #fbf7f8;
-  --ink: #16090e;
-  --ink-muted: #6e5a61;
-  --rose: #f4c6d3;
-  --rose-soft: #fceef2;
-  --rose-deep: #c92a64;
-  --hairline: #ebdde2;
-  --hairline-strong: #e0cdd4;
+  --paper: #1a171c;          /* cards / panels */
+  --paper-warm: #121014;     /* page background */
+  --ink: #f2edef;
+  --ink-muted: #9c8f96;
+  --rose: #3d2230;           /* soft fill / subtle border */
+  --rose-soft: #22121a;      /* tint background */
+  --rose-deep: #e0487e;      /* accent (brighter for dark contrast) */
+  --rose-bar: #a23a5f;       /* legible meter/bar fill on dark tracks */
+  --hairline: #2e282e;
+  --hairline-strong: #3c353c;
 
-  --win: #2f8f6b;
-  --loss: #c96a5b;
-  --draw: #a8927a;
+  --win: #4fb98c;
+  --loss: #e07b6a;
+  --draw: #b8a288;
+
+  --nav-bg: rgba(18, 16, 20, .86);
+  --logo-chip: rgba(255, 255, 255, .88);
 
   --r-card: 8px;
   --r-chip: 2px;
@@ -32,6 +39,26 @@
 
   --wrap: 1120px;
   --pad: 22px;
+}
+
+[data-theme="light"] {
+  --paper: #ffffff;
+  --paper-warm: #fbf7f8;
+  --ink: #16090e;
+  --ink-muted: #6e5a61;
+  --rose: #f4c6d3;
+  --rose-soft: #fceef2;
+  --rose-deep: #c92a64;
+  --rose-bar: #f4c6d3;
+  --hairline: #ebdde2;
+  --hairline-strong: #e0cdd4;
+
+  --win: #2f8f6b;
+  --loss: #c96a5b;
+  --draw: #a8927a;
+
+  --nav-bg: rgba(251, 247, 248, .86);
+  --logo-chip: transparent;
 }
 
 /* ---- 2. reset / base --------------------------------------------- */
@@ -46,7 +73,7 @@ body {
   color: var(--ink);
   background: var(--paper-warm);
   background-image:
-    radial-gradient(120% 80% at 50% -12%, var(--rose-soft) 0%, rgba(252, 238, 242, 0) 55%);
+    radial-gradient(120% 80% at 50% -12%, var(--rose-soft) 0%, transparent 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -70,7 +97,7 @@ input { font: inherit; }
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(251, 247, 248, .86);
+  background: var(--nav-bg);
   backdrop-filter: saturate(1.4) blur(10px);
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
   border-bottom: 1px solid var(--hairline);
@@ -159,6 +186,25 @@ input { font: inherit; }
 .status-chip.is-live { border-color: var(--rose); }
 .status-chip.is-live .sc-txt { color: var(--rose-deep); }
 .status-chip.is-err .sc-txt { color: var(--loss); }
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border: 1px solid var(--hairline);
+  border-radius: 100px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  flex: none;
+  transition: color var(--t), border-color var(--t), background var(--t);
+}
+.theme-toggle:hover { color: var(--rose-deep); border-color: var(--rose); }
+.theme-toggle svg { width: 15px; height: 15px; display: block; }
+/* default (dark) shows the sun = "switch to light"; light shows the moon */
+.theme-toggle .icon-moon { display: none; }
+[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 
 .live-dot {
   width: 7px; height: 7px;
@@ -389,6 +435,33 @@ input { font: inherit; }
   color: var(--ink);
   border-color: var(--hairline-strong);
 }
+.tag-out {
+  color: var(--ink-muted);
+  border-color: var(--hairline);
+  background: transparent;
+}
+.tag-alive {
+  color: var(--win);
+  border-color: var(--hairline-strong);
+  background: transparent;
+}
+/* inline OUT marker used where a full tag would be too heavy (board rows) */
+.out-mark {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.elim-note {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
 
 /* ---- 8. tables --------------------------------------------------- */
 .tbl { width: 100%; border-collapse: collapse; }
@@ -437,7 +510,7 @@ input { font: inherit; }
 .meter-fill {
   display: block;
   height: 100%;
-  background: var(--rose);
+  background: var(--rose-bar);
   border-radius: 100px;
   transition: width .4s var(--ease);
 }
@@ -452,7 +525,7 @@ input { font: inherit; }
   background: var(--hairline);
 }
 .dbar-h { background: var(--rose-deep); }
-.dbar-a { background: var(--rose); }
+.dbar-a { background: var(--rose-bar); }
 
 /* ---- 10. matches view -------------------------------------------- */
 .m-sec { margin-bottom: 34px; }
@@ -780,13 +853,16 @@ input { font: inherit; }
 .standings .rank { color: var(--ink-muted); width: 22px; }
 .standings .team { width: 40%; }
 .team-cell { display: inline-flex; align-items: center; gap: 8px; }
-.logo { width: 18px; height: 18px; border-radius: 3px; object-fit: contain; flex: none; }
+.logo { width: 18px; height: 18px; border-radius: 3px; object-fit: contain; flex: none; background: var(--logo-chip); }
 .logo-ph { background: var(--hairline); }
 .tname { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .standings .gd { color: var(--ink-muted); }
 .standings .pts { font-weight: 600; color: var(--ink); }
-.standings tr.is-adv { background: linear-gradient(90deg, var(--rose-soft), rgba(252, 238, 242, .35)); }
+.standings tr.is-adv { background: linear-gradient(90deg, var(--rose-soft), transparent); }
 .standings tr.is-adv .rank { color: var(--rose-deep); }
+/* eliminated (dead) rows — dimmed across groups/leaders */
+.row-out { opacity: .5; }
+.standings tr.row-out { opacity: .5; }
 
 /* ---- 13. leaders ------------------------------------------------- */
 .hero-boards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -842,7 +918,9 @@ input { font: inherit; }
   padding: 4px 0;
 }
 .cr-rank { font-size: 11px; color: var(--ink-muted); }
-.cr-name { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-name { font-size: 12.5px; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.cr-player { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-abbr { flex: none; }
 .cr-val { font-size: 12.5px; font-weight: 600; }
 
 /* ---- 14. markets ------------------------------------------------- */

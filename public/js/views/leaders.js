@@ -1,6 +1,6 @@
 // views/leaders.js — tournament leaders. Goals/assists render immediately
 // from /api/stats; other categories resolve athlete names via /api/athletes.
-import { fetchJSON, resolveAthletes } from '../api.js';
+import { fetchJSON, resolveAthletes, getAliveMaps, isDead, lookupTeam } from '../api.js';
 import { esc } from '../format.js';
 import { errorState, emptyState, meter } from './_shared.js';
 
@@ -21,9 +21,9 @@ export function mount(root) {
 
   async function loadStats() {
     try {
-      const s = await fetchJSON('/api/stats');
+      const [s, aliveMaps] = await Promise.all([fetchJSON('/api/stats'), getAliveMaps()]);
       if (!alive) return;
-      hero.innerHTML = board('Golden Boot', s.goals, 'goals') + board('Assists', s.assists, 'assists');
+      hero.innerHTML = board('Golden Boot', s.goals, 'goals', aliveMaps) + board('Assists', s.assists, 'assists', aliveMaps);
     } catch (e) {
       if (alive) errorState(hero, {
         title: 'Leaders unavailable', note: e.message,
@@ -34,8 +34,9 @@ export function mount(root) {
 
   async function loadCats() {
     let data;
+    let aliveMaps;
     try {
-      data = await fetchJSON('/api/leaders');
+      [data, aliveMaps] = await Promise.all([fetchJSON('/api/leaders'), getAliveMaps()]);
     } catch (e) {
       if (alive) errorState(cats, {
         title: 'Category leaders unavailable', note: e.message,
@@ -53,7 +54,7 @@ export function mount(root) {
     let names = new Map();
     try { names = await resolveAthletes(ids); } catch (_) { /* fall back to ids */ }
     if (!alive) return;
-    cats.innerHTML = `<div class="grid grid-cats">${categories.map((c) => catCard(c, names)).join('')}</div>`;
+    cats.innerHTML = `<div class="grid grid-cats">${categories.map((c) => catCard(c, names, aliveMaps)).join('')}</div>`;
   }
 
   loadStats();
@@ -80,19 +81,21 @@ function catsSkeleton() {
   return `<div class="grid grid-cats">${cards}</div>`;
 }
 
-function board(title, list, unit) {
+function board(title, list, unit, alive) {
   const items = (list || []).filter((x) => x && x.val != null);
   if (!items.length) {
     return `<div class="board card"><div class="board-title">${esc(title)}</div><div class="sub-inline muted">No data yet.</div></div>`;
   }
   const max = Math.max(...items.map((x) => Number(x.val) || 0)) || 1;
   const rows = items.slice(0, 12).map((x, i) => {
+    const dead = isDead(alive, { abbr: x.team, name: x.team });
     const m = x.matches != null ? ` · ${esc(x.matches)} ${Number(x.matches) === 1 ? 'match' : 'matches'}` : '';
-    return `<div class="board-row">
+    const out = dead ? ' · <span class="out-mark">out</span>' : '';
+    return `<div class="board-row${dead ? ' row-out' : ''}">
       <span class="br-rank mono">${i + 1}</span>
       <div class="br-main">
         <div class="br-top"><span class="br-name">${esc(x.name || '')}</span><span class="br-val mono">${esc(x.val)}</span></div>
-        <div class="br-meta micro muted">${esc(x.team || '')}${m}</div>
+        <div class="br-meta micro muted">${esc(x.team || '')}${m}${out}</div>
         ${meter((Number(x.val) || 0) / max * 100, i === 0)}
       </div>
     </div>`;
@@ -103,15 +106,23 @@ function board(title, list, unit) {
   </div>`;
 }
 
-function catCard(c, names) {
+function catCard(c, names, alive) {
   const leaders = (c.leaders || []).slice(0, 8);
   const rows = leaders.map((l, i) => {
     const a = names.get(String(l.athleteId));
     const nm = (a && a.name) || (l.athleteId != null ? '#' + l.athleteId : '—');
     const val = l.displayValue != null ? l.displayValue : (l.value != null ? l.value : '');
-    return `<div class="cat-row">
+    const tid = l.teamId != null ? l.teamId : (a && a.teamId);
+    const dead = isDead(alive, { teamId: tid });
+    let out = '';
+    if (dead) {
+      const team = lookupTeam(alive, { teamId: tid });
+      const abbr = team && team.abbr ? `<span class="cr-abbr micro muted">${esc(team.abbr)}</span>` : '';
+      out = `${abbr}<span class="out-mark">out</span>`;
+    }
+    return `<div class="cat-row${dead ? ' row-out' : ''}">
       <span class="cr-rank mono">${i + 1}</span>
-      <span class="cr-name">${esc(nm)}</span>
+      <span class="cr-name"><span class="cr-player">${esc(nm)}</span>${out}</span>
       <span class="cr-val mono">${esc(val)}</span>
     </div>`;
   }).join('');

@@ -2,6 +2,7 @@ name = "wc2026"
 main = "src/worker.js"
 compatibility_date = "2026-06-01"
 account_id = "b64c7c66170425db251eacdb4e3286da"
+workers_dev = true
 
 # Custom domain — requires ratnani.org zone on this Cloudflare account
 routes = [
