@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WC26 · Live board — wc2026.ratnani.org</title>
+<meta name="description" content="A live FIFA World Cup 2026 board — scores, group standings, tournament leaders, and betting markets. Editorial, fast, no fuss.">
+<meta name="theme-color" content="#fbf7f8">
+<meta name="color-scheme" content="light">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="wc2026.ratnani.org">
+<meta property="og:title" content="WC26 · Live tournament board">
+<meta property="og:description" content="Live scores, group standings, tournament leaders, and betting markets for the 2026 FIFA World Cup.">
+<meta property="og:url" content="https://wc2026.ratnani.org/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="WC26 · Live tournament board">
+<meta name="twitter:description" content="Live scores, standings, leaders, and markets for the 2026 FIFA World Cup.">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Ccircle%20cx='16'%20cy='16'%20r='14'%20fill='%23c92a64'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='4.5'%20fill='%23fff'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#/" aria-label="WC26 home">
+      <span class="brand-mark">WC</span><span class="brand-txt">26</span>
+      <span class="brand-sub">/ ratnani.org</span>
+    </a>
+    <div class="nav-tabs">
+      <a data-nav="matches" href="#/">Matches</a>
+      <a data-nav="groups" href="#/groups">Groups</a>
+      <a data-nav="leaders" href="#/leaders">Leaders</a>
+      <a data-nav="markets" href="#/markets">Markets</a>
+    </div>
+    <span class="status-chip" id="status-chip" aria-live="polite" aria-label="Live status">
+      <span class="idle-dot" aria-hidden="true"></span><span class="sc-txt mono">connecting</span>
+    </span>
+  </div>
+</nav>
+
+<main id="view"></main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <span><b>FIFA World Cup 2026</b> · Final Jul 19 · MetLife Stadium</span>
+    <span class="dot-sep">·</span>
+    <span>Match data via ESPN public feeds through an edge cache. Odds indicative, not betting advice.</span>
+    <span class="dot-sep">·</span>
+    <span>wc2026.ratnani.org</span>
+  </div>
+</footer>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
