@@ -1,7 +1,7 @@
 // views/groups.js — group-stage standings.
 import { fetchJSON, Poller, getAliveMaps, isDead } from '../api.js';
 import { esc } from '../format.js';
-import { errorState, emptyState, tag } from './_shared.js';
+import { errorState, emptyState, tag, teamLink } from './_shared.js';
 
 export function mount(root) {
   root.innerHTML = `<div class="view view-groups"><div class="wrap">
@@ -66,7 +66,7 @@ function groupCard(g, alive) {
     const cls = [e.advanced ? 'is-adv' : '', dead ? 'row-out' : ''].filter(Boolean).join(' ');
     return `<tr class="${cls}">
     <td class="r mono rank">${esc(e.rank ?? i + 1)}</td>
-    <td class="l team"><span class="team-cell">${e.logo ? `<img class="logo" src="${esc(e.logo)}" alt="" loading="lazy" width="18" height="18">` : '<span class="logo logo-ph" aria-hidden="true"></span>'}<span class="tname">${esc(e.team || e.abbr || '')}</span>${dead ? ' ' + tag('out', 'out') : ''}</span></td>
+    <td class="l team"><span class="team-cell">${e.logo ? `<img class="logo" src="${esc(e.logo)}" alt="" loading="lazy" width="18" height="18">` : '<span class="logo logo-ph" aria-hidden="true"></span>'}${teamLink(e.teamId, e.team || e.abbr || '', 'tname')}${dead ? ' ' + tag('out', 'out') : ''}</span></td>
     <td class="r mono">${num(e.played)}</td>
     <td class="r mono">${num(e.wins)}</td>
     <td class="r mono">${num(e.draws)}</td>

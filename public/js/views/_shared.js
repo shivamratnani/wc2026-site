@@ -96,6 +96,13 @@ export function playerLink(id, name, className = '') {
   return `<a class="${esc(cls)}" href="#/player/${encodeURIComponent(id)}">${label}</a>`;
 }
 
+export function teamLink(id, name, className = '') {
+  const label = esc(name || 'Unknown team');
+  if (id == null || id === '') return `<span class="${esc(className)}">${label}</span>`;
+  const cls = ['team-link', className].filter(Boolean).join(' ');
+  return `<a class="${esc(cls)}" href="#/team/${encodeURIComponent(id)}">${label}</a>`;
+}
+
 // odds cell: current american price in mono + open->current movement arrow.
 export function oddsCell(open, current) {
   const shown = current || open;

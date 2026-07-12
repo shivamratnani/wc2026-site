@@ -1,7 +1,7 @@
 // views/match.js — single match detail. Sections fail independently.
 import { fetchJSON, Poller, getAliveMaps, isDead } from '../api.js';
 import { esc, fmtDateTime, minuteBadge, resultChip } from '../format.js';
-import { panelHead, oddsCell, hasOddsPrice, playerLink, twoSidedBar, inlineNote, liveDot } from './_shared.js';
+import { panelHead, oddsCell, hasOddsPrice, playerLink, teamLink, twoSidedBar, inlineNote, liveDot } from './_shared.js';
 
 const PLAYER_COLS = [
   { k: 'goals', l: 'G' },
@@ -147,13 +147,13 @@ function renderHeader(d, aliveMaps) {
     <div class="mh-status micro">${esc(h.status || '')} ${badge}</div>
     <div class="mh-score">
       <div class="mh-team">
-        <div class="mh-name">${esc(home.team || 'TBD')}</div>
+        <div class="mh-name">${teamLink(home.id, home.team || 'TBD')}</div>
         <div class="mh-form">${formStrip((d.form || {}).home)}</div>
         ${elimNote(home)}
       </div>
       <div class="mh-mid">${mid}${pens}</div>
       <div class="mh-team">
-        <div class="mh-name">${esc(away.team || 'TBD')}</div>
+        <div class="mh-name">${teamLink(away.id, away.team || 'TBD')}</div>
         <div class="mh-form">${formStrip((d.form || {}).away)}</div>
         ${elimNote(away)}
       </div>

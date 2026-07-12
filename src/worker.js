@@ -15,6 +15,7 @@
 //   GET /api/leaders            tournament stat leaders (goals, assists, saves, ...)
 //   GET /api/athletes?ids=1,2   batch athlete resolver (name/jersey/pos/team)
 //   GET /api/player?id=ID       player bio, national team, club, and tournament stats
+//   GET /api/team?id=ID         team profile, standing, schedule, stats, leaders, and squad
 //   GET /api/alive              team life status (advanced from group, not yet knocked out)
 //   GET /api/predictions        prediction markets (Kalshi, Polymarket fallback)
 //   GET /api/markets            Anthropic web-search futures/boot odds
@@ -707,6 +708,21 @@ async function wikipediaPlayerPhoto(name) {
   }
 }
 
+function statisticMap(data) {
+  const stats = {};
+  for (const category of data.splits?.categories || []) {
+    for (const stat of category.stats || []) {
+      stats[stat.name] = {
+        label: stat.displayName ?? stat.name,
+        shortLabel: stat.shortDisplayName ?? stat.abbreviation ?? stat.displayName ?? stat.name,
+        value: stat.value ?? null,
+        displayValue: stat.displayValue ?? null,
+      };
+    }
+  }
+  return stats;
+}
+
 async function apiPlayer(id) {
   if (!id) return json({ error: 'missing id' }, 10, 400);
   if (!/^\d+$/.test(String(id))) return json({ error: 'invalid id' }, 10, 400);
@@ -724,17 +740,7 @@ async function apiPlayer(id) {
     athlete.headshot?.href ? null : wikipediaPlayerPhoto(athlete.displayName ?? athlete.fullName),
   ]);
 
-  const stats = {};
-  for (const category of statistics.splits?.categories || []) {
-    for (const stat of category.stats || []) {
-      stats[stat.name] = {
-        label: stat.displayName ?? stat.name,
-        shortLabel: stat.shortDisplayName ?? stat.abbreviation ?? stat.displayName ?? stat.name,
-        value: stat.value ?? null,
-        displayValue: stat.displayValue ?? null,
-      };
-    }
-  }
+  const stats = statisticMap(statistics);
 
   const teamShape = t => t ? {
     id: t.id ?? null,
@@ -772,6 +778,164 @@ async function apiPlayer(id) {
     club: teamShape(club),
     stats,
   }, 600);
+}
+
+// ============================================================================
+// GET /api/team?id=ID — team profile + 2026 World Cup tournament dashboard
+// ============================================================================
+
+function scheduleScore(competitor) {
+  const score = competitor?.score;
+  if (score && typeof score === 'object') return score.displayValue ?? score.value ?? null;
+  return score ?? null;
+}
+
+function teamScheduleMatch(event, teamId) {
+  const competition = event.competitions?.[0] || {};
+  const competitors = competition.competitors || [];
+  const own = competitors.find(c => String(c.team?.id ?? c.id) === String(teamId));
+  const opponent = competitors.find(c => c !== own);
+  if (!own || !opponent) return null;
+  const state = competition.status?.type?.state ?? null;
+  const ownScore = scheduleScore(own);
+  const opponentScore = scheduleScore(opponent);
+  const result = state === 'post' ? (own.winner ? 'W' : opponent.winner ? 'L' : 'D') : null;
+  return {
+    id: event.id ?? competition.id ?? null,
+    date: competition.date ?? event.date ?? null,
+    stage: event.seasonType?.name ?? event.season?.type?.name ?? null,
+    state,
+    status: competition.status?.type?.description ?? null,
+    detail: competition.status?.type?.detail ?? null,
+    venue: competition.venue?.fullName ?? null,
+    note: competition.notes?.[0]?.headline ?? competition.notes?.[0]?.text ?? null,
+    homeAway: own.homeAway ?? null,
+    score: ownScore,
+    opponentScore,
+    pens: own.shootoutScore ?? null,
+    opponentPens: opponent.shootoutScore ?? null,
+    result,
+    opponent: {
+      id: opponent.team?.id ?? opponent.id ?? null,
+      name: opponent.team?.displayName ?? opponent.team?.name ?? null,
+      abbr: opponent.team?.abbreviation ?? null,
+      logo: opponent.team?.logos?.[0]?.href ?? opponent.team?.logo ?? null,
+    },
+  };
+}
+
+function teamStanding(standings, teamId) {
+  for (const group of standings.children || []) {
+    const entry = (group.standings?.entries || []).find(e => String(e.team?.id) === String(teamId));
+    if (!entry) continue;
+    const stats = {};
+    for (const stat of entry.stats || []) stats[stat.name] = stat.value ?? null;
+    return {
+      group: group.name ?? null,
+      rank: stats.rank,
+      played: stats.gamesPlayed,
+      wins: stats.wins,
+      draws: stats.ties,
+      losses: stats.losses,
+      gf: stats.pointsFor,
+      ga: stats.pointsAgainst,
+      gd: stats.pointDifferential,
+      points: stats.points,
+      advanced: !!Number(stats.advanced),
+    };
+  }
+  return null;
+}
+
+async function apiTeam(id) {
+  if (!id) return json({ error: 'missing id' }, 10, 400);
+  if (!/^\d+$/.test(String(id))) return json({ error: 'invalid id' }, 10, 400);
+
+  const [teamData, rosterData, scheduleData, statistics, leaderData, standings] = await Promise.all([
+    fetchJSON(`${SITE}/teams/${id}`, 86400),
+    fetchJSON(`${SITE}/teams/${id}/roster`, 86400).catch(() => ({})),
+    fetchJSON(`${SITE}/teams/${id}/schedule?season=2026`, 300).catch(() => ({})),
+    fetchJSON(`${CORE}/seasons/2026/types/1/teams/${id}/statistics`, 600).catch(() => ({})),
+    fetchJSON(`${CORE}/seasons/2026/types/1/teams/${id}/leaders?limit=10`, 600).catch(() => ({})),
+    fetchJSON(`${SITE2}/standings`, 300).catch(() => ({})),
+  ]);
+
+  const rawTeam = teamData.team || teamData;
+  const roster = (rosterData.athletes || []).map(athlete => ({
+    id: athlete.id ?? null,
+    name: athlete.displayName ?? athlete.fullName ?? null,
+    shortName: athlete.shortName ?? null,
+    jersey: athlete.jersey ?? null,
+    position: athlete.position?.displayName ?? athlete.position?.name ?? null,
+    positionAbbr: athlete.position?.abbreviation ?? null,
+    headshot: athlete.headshot?.href ?? null,
+  }));
+  const rosterById = new Map(roster.map(player => [String(player.id), player]));
+
+  const leaderKeys = new Set(['goals', 'assists', 'shotsOnTarget', 'accuratePasses', 'saves']);
+  const leaders = (leaderData.categories || [])
+    .filter(category => leaderKeys.has(category.name))
+    .map(category => ({
+      key: category.name,
+      label: category.displayName ?? category.name,
+      leaders: (category.leaders || [])
+        .map(leader => {
+          const athleteId = idFromRef(leader.athlete?.$ref);
+          const player = rosterById.get(String(athleteId));
+          return {
+            athleteId,
+            name: player?.name ?? null,
+            position: player?.positionAbbr ?? null,
+            value: leader.value ?? null,
+            displayValue: leader.displayValue ?? null,
+          };
+        })
+        .filter(leader => leader.name && Number(leader.value) > 0)
+        .slice(0, 5),
+    }))
+    .filter(category => category.leaders.length);
+
+  const rawEvents = [...(scheduleData.events || []), ...(rawTeam.nextEvent || [])];
+  const seenMatches = new Set();
+  const matches = rawEvents
+    .map(event => teamScheduleMatch(event, id))
+    .filter(match => {
+      if (!match?.id || seenMatches.has(String(match.id))) return false;
+      seenMatches.add(String(match.id));
+      return true;
+    })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const completed = matches.filter(match => match.state === 'post');
+  const record = {
+    played: completed.length,
+    wins: completed.filter(match => match.result === 'W').length,
+    draws: completed.filter(match => match.result === 'D').length,
+    losses: completed.filter(match => match.result === 'L').length,
+    gf: completed.reduce((total, match) => total + (Number(match.score) || 0), 0),
+    ga: completed.reduce((total, match) => total + (Number(match.opponentScore) || 0), 0),
+  };
+  const teamUrl = (rawTeam.links || []).find(link => (link.rel || []).includes('clubhouse'))?.href ?? null;
+
+  return json({
+    updatedAt: new Date().toISOString(),
+    team: {
+      id: rawTeam.id ?? id,
+      name: rawTeam.displayName ?? rawTeam.name ?? null,
+      shortName: rawTeam.shortDisplayName ?? rawTeam.displayName ?? null,
+      abbr: rawTeam.abbreviation ?? null,
+      logo: rawTeam.logos?.[0]?.href ?? rawTeam.logo ?? null,
+      color: rawTeam.color ?? null,
+      alternateColor: rawTeam.alternateColor ?? null,
+      espnUrl: teamUrl,
+    },
+    standing: teamStanding(standings, id),
+    record,
+    stats: statisticMap(statistics),
+    leaders,
+    roster,
+    matches,
+  }, 300);
 }
 
 // ============================================================================
@@ -944,6 +1108,7 @@ const routes = {
   '/api/leaders': () => apiLeaders(),
   '/api/athletes': p => apiAthletes(p.get('ids')),
   '/api/player': p => apiPlayer(p.get('id')),
+  '/api/team': p => apiTeam(p.get('id')),
   '/api/alive': () => apiAlive(),
   '/api/predictions': p => apiPredictions(p.get('debug')),
   '/api/markets': (p, env, ctx) => apiMarkets(env, ctx),
