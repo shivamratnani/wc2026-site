@@ -100,7 +100,7 @@ function render(root, data) {
 
 function playerImage(player) {
   if (player.headshot) {
-    return `<img class="player-photo" src="${esc(safeUrl(player.headshot))}" alt="${esc(player.name || 'Player')}" width="180" height="180">`;
+    return `<img class="player-photo" src="${esc(safeUrl(player.headshot))}" alt="${esc(player.name || 'Player')}">`;
   }
   const initials = String(player.name || '?').split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join('');
   return `<div class="player-photo player-initials" aria-hidden="true">${esc(initials)}</div>`;
