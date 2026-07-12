@@ -89,6 +89,13 @@ export function panelHead(title, extra) {
   return `<div class="panel-head"><h3 class="panel-title">${esc(title)}</h3>${extra || ''}</div>`;
 }
 
+export function playerLink(id, name, className = '') {
+  const label = esc(name || 'Unknown player');
+  if (id == null || id === '') return `<span class="${esc(className)}">${label}</span>`;
+  const cls = ['player-link', className].filter(Boolean).join(' ');
+  return `<a class="${esc(cls)}" href="#/player/${encodeURIComponent(id)}">${label}</a>`;
+}
+
 // odds cell: current american price in mono + open->current movement arrow.
 export function oddsCell(open, current) {
   const shown = current || open;

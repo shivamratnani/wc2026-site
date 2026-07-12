@@ -14,6 +14,7 @@
 //   GET /api/props?id=EVENTID   DraftKings player prop bets, grouped by type
 //   GET /api/leaders            tournament stat leaders (goals, assists, saves, ...)
 //   GET /api/athletes?ids=1,2   batch athlete resolver (name/jersey/pos/team)
+//   GET /api/player?id=ID       player bio, national team, club, and tournament stats
 //   GET /api/alive              team life status (advanced from group, not yet knocked out)
 //   GET /api/predictions        prediction markets (Kalshi, Polymarket fallback)
 //   GET /api/markets            Anthropic web-search futures/boot odds
@@ -174,6 +175,7 @@ async function apiStats() {
             const m = /Goals:\s*(\d+)|Assists:\s*(\d+)/.exec(l.displayValue || '');
             const matches2 = /Matches:\s*(\d+)/.exec(l.displayValue || '');
             bucket.push({
+              athleteId: l.athlete?.id ?? idFromRef(l.athlete?.$ref),
               name: l.athlete?.displayName || '',
               team: l.team?.abbreviation || l.athlete?.teamShortName || '',
               val: l.value ?? (m ? parseInt(m[1] || m[2], 10) : null),
@@ -427,6 +429,7 @@ async function apiMatch(id) {
         text: k.text ?? null,
         shortText: k.shortText ?? null,
         teamId: k.team?.id ?? null,
+        athleteId: participant.athlete?.id ?? participant.id ?? null,
         player: participant.athlete?.displayName ?? participant.displayName ?? null,
         scoringPlay: !!k.scoringPlay,
         shootout: !!k.shootout,
@@ -677,6 +680,75 @@ async function apiAthletes(idsParam) {
 }
 
 // ============================================================================
+// GET /api/player?id=ID — player profile + 2026 World Cup statistics
+// ============================================================================
+
+async function apiPlayer(id) {
+  if (!id) return json({ error: 'missing id' }, 10, 400);
+  if (!/^\d+$/.test(String(id))) return json({ error: 'invalid id' }, 10, 400);
+
+  const [athlete, statistics] = await Promise.all([
+    fetchJSON(`${CORE}/seasons/2026/athletes/${id}`, 86400),
+    fetchJSON(`${CORE}/seasons/2026/types/1/athletes/${id}/statistics`, 600).catch(() => ({})),
+  ]);
+
+  const teamId = idFromRef(athlete.team?.$ref);
+  const clubId = idFromRef(athlete.defaultTeam?.$ref);
+  const [team, club] = await Promise.all([
+    teamId ? fetchJSON(`${CORE}/seasons/2026/teams/${teamId}`, 86400).catch(() => null) : null,
+    clubId ? fetchJSON(`https://sports.core.api.espn.com/v2/sports/soccer/teams/${clubId}`, 86400).catch(() => null) : null,
+  ]);
+
+  const stats = {};
+  for (const category of statistics.splits?.categories || []) {
+    for (const stat of category.stats || []) {
+      stats[stat.name] = {
+        label: stat.displayName ?? stat.name,
+        shortLabel: stat.shortDisplayName ?? stat.abbreviation ?? stat.displayName ?? stat.name,
+        value: stat.value ?? null,
+        displayValue: stat.displayValue ?? null,
+      };
+    }
+  }
+
+  const teamShape = t => t ? {
+    id: t.id ?? null,
+    name: t.displayName ?? t.name ?? null,
+    abbr: t.abbreviation ?? null,
+    logo: t.logos?.[0]?.href ?? null,
+  } : null;
+  const birthPlace = [athlete.birthPlace?.city, athlete.birthPlace?.state, athlete.birthPlace?.country]
+    .filter(Boolean).join(', ');
+  const espnUrl = (athlete.links || []).find(link => (link.rel || []).includes('playercard'))?.href || null;
+
+  return json({
+    updatedAt: new Date().toISOString(),
+    player: {
+      id: athlete.id ?? id,
+      name: athlete.displayName ?? athlete.fullName ?? null,
+      fullName: athlete.fullName ?? athlete.displayName ?? null,
+      shortName: athlete.shortName ?? null,
+      headshot: athlete.headshot?.href ?? null,
+      flag: athlete.flag?.href ?? null,
+      position: athlete.position?.displayName ?? athlete.position?.name ?? null,
+      positionAbbr: athlete.position?.abbreviation ?? null,
+      jersey: athlete.jersey ?? null,
+      age: athlete.age ?? null,
+      dateOfBirth: athlete.dateOfBirth ?? null,
+      birthPlace: birthPlace || null,
+      citizenship: athlete.citizenship ?? null,
+      height: athlete.displayHeight ?? null,
+      weight: athlete.displayWeight ?? null,
+      active: athlete.active ?? null,
+      espnUrl,
+    },
+    team: teamShape(team),
+    club: teamShape(club),
+    stats,
+  }, 600);
+}
+
+// ============================================================================
 // GET /api/alive — tournament life status per team
 // Dead = failed to advance from the group, or lost a completed knockout tie.
 // ============================================================================
@@ -845,6 +917,7 @@ const routes = {
   '/api/props': p => apiProps(p.get('id')),
   '/api/leaders': () => apiLeaders(),
   '/api/athletes': p => apiAthletes(p.get('ids')),
+  '/api/player': p => apiPlayer(p.get('id')),
   '/api/alive': () => apiAlive(),
   '/api/predictions': p => apiPredictions(p.get('debug')),
   '/api/markets': (p, env, ctx) => apiMarkets(env, ctx),

@@ -1,6 +1,7 @@
 // app.js — hash router + persistent nav live-status chip.
 import * as matches from './views/matches.js';
 import * as matchView from './views/match.js';
+import * as playerView from './views/player.js';
 import * as bracket from './views/bracket.js';
 import * as groups from './views/groups.js';
 import * as leaders from './views/leaders.js';
@@ -9,6 +10,7 @@ import { fetchJSON, Poller } from './api.js';
 import { esc, fmtTime } from './format.js';
 
 const ROUTES = [
+  { test: (h) => h === '#/player' || /^#\/player\//.test(h), view: playerView, nav: null, title: 'Player', params: (h) => ({ id: decodeURIComponent(h.replace(/^#\/player\/?/, '')) }) },
   { test: (h) => h === '#/match' || /^#\/match\//.test(h), view: matchView, nav: null, title: 'Match', params: (h) => ({ id: decodeURIComponent(h.replace(/^#\/match\/?/, '')) }) },
   { test: (h) => h === '#/bracket', view: bracket, nav: 'bracket', title: 'Bracket' },
   { test: (h) => h === '#/groups', view: groups, nav: 'groups', title: 'Groups' },

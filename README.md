@@ -14,6 +14,7 @@ directly and repeat reads are essentially free. There is no build step.
 - `src/worker.js` — edge API:
   - `GET /api/live`    scores + status + DraftKings odds; 15s cache when a match is live, 60s idle
   - `GET /api/bracket` complete knockout bracket; 15s cache when a match is live, 5 min idle
+  - `GET /api/player`  player bio, national team, club, and 2026 tournament statistics
   - `GET /api/stats`   goals/assists leaders; 5 min cache
   - `GET /api/markets` optional futures/props via Anthropic web search; 15 min cache
 - `public/` — static frontend; polls `/api/live` during matches, backs off when idle,

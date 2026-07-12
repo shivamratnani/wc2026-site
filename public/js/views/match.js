@@ -1,7 +1,7 @@
 // views/match.js — single match detail. Sections fail independently.
 import { fetchJSON, Poller, getAliveMaps, isDead } from '../api.js';
 import { esc, fmtDateTime, minuteBadge, resultChip } from '../format.js';
-import { panelHead, oddsCell, hasOddsPrice, twoSidedBar, inlineNote, liveDot } from './_shared.js';
+import { panelHead, oddsCell, hasOddsPrice, playerLink, twoSidedBar, inlineNote, liveDot } from './_shared.js';
 
 const PLAYER_COLS = [
   { k: 'goals', l: 'G' },
@@ -194,7 +194,7 @@ function scorerStrip(d, homeId, awayId) {
     const key = name + '|' + marker;
     let scorer = bySide[side].find(item => item.key === key);
     if (!scorer) {
-      scorer = { key, name, marker, minutes: [] };
+      scorer = { key, id: event.athleteId, name, marker, minutes: [] };
       bySide[side].push(scorer);
     }
     scorer.minutes.push(minuteBadge(event.minute));
@@ -225,7 +225,7 @@ function scorerName(event) {
 
 function scorerItem(scorer) {
   const marker = scorer.marker ? ` <span class="mh-goal-kind">(${esc(scorer.marker)})</span>` : '';
-  return `<span class="mh-scorer"><span>${esc(scorer.name)}</span>${marker} <span class="mono">${scorer.minutes.map(esc).join(', ')}</span></span>`;
+  return `<span class="mh-scorer">${playerLink(scorer.id, scorer.name)}${marker} <span class="mono">${scorer.minutes.map(esc).join(', ')}</span></span>`;
 }
 
 // ---- timeline -----------------------------------------------------
@@ -310,7 +310,7 @@ function playerLine(p, isSub) {
   else if (p.subbedOutMinute != null) badge = `<span class="lu-min mono out">${esc(minuteBadge(p.subbedOutMinute))}<span aria-hidden="true">↓</span></span>`;
   return `<li class="lu-p${isSub ? ' is-sub' : ''}">
     <span class="lu-num mono">${esc(p.jersey ?? '')}</span>
-    <span class="lu-name">${esc(p.name || '')}</span>
+    ${playerLink(p.id, p.name || '', 'lu-name')}
     ${p.pos ? `<span class="lu-pos micro muted">${esc(p.pos)}</span>` : ''}
     ${badge}
   </li>`;
@@ -365,7 +365,7 @@ function renderPlayerStats(d) {
     const name = teamNameFor(d, team.teamId);
     const head = `<tr><th class="l">${esc(name)}</th>${active.map((c) => `<th class="r">${c.l}</th>`).join('')}</tr>`;
     const rows = players.map((p) => `<tr>
-      <td class="l"><span class="ps-name">${esc(p.name || '')}</span>${p.pos ? ` <span class="micro muted">${esc(p.pos)}</span>` : ''}</td>
+      <td class="l">${playerLink(p.id, p.name || '', 'ps-name')}${p.pos ? ` <span class="micro muted">${esc(p.pos)}</span>` : ''}</td>
       ${active.map((c) => `<td class="r mono">${fmtStat(p[c.k])}</td>`).join('')}
     </tr>`).join('');
     return `<div class="ps-table tbl-scroll"><table class="tbl compact"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
@@ -445,7 +445,7 @@ function propRow(e) {
     ? `<span class="prop-ou"><span class="prop-ou-k micro">${label}</span>${oddsCell(pair.open, pair.current)}</span>`
     : '<span aria-hidden="true"></span>';
   return `<div class="prop-row">
-    <span class="prop-name">${esc(e.name || '')}${e.teamAbbr ? ` <span class="micro muted mono">${esc(e.teamAbbr)}</span>` : ''}</span>
+    <span class="prop-name">${playerLink(e.athleteId, e.name || '')}${e.teamAbbr ? ` <span class="micro muted mono">${esc(e.teamAbbr)}</span>` : ''}</span>
     <span class="prop-line mono">${e.line != null ? esc(e.line) : ''}</span>
     ${side('O', over)}
     ${side('U', under)}
