@@ -1182,6 +1182,9 @@ button.back-link { padding: 0; border: 0; background: none; }
 .player-team > span, .player-team > a { display: flex; align-items: center; gap: 8px; }
 .player-team img { width: 22px; height: 22px; object-fit: contain; background: var(--logo-chip); border-radius: 2px; }
 .player-team b { font-size: 14px; font-weight: 600; }
+.player-team > a.team-link { border-bottom: 0; }
+.player-team > a.team-link b { border-bottom: 1px solid transparent; transition: border-color var(--t); }
+.player-team > a.team-link:hover b { border-color: var(--rose-deep); }
 
 .player-snapshot {
   display: grid;
@@ -1326,14 +1329,18 @@ button.back-link { padding: 0; border: 0; background: none; }
   grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
-  padding: 9px 0;
+  padding: 9px 7px;
   border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
   font-size: 13px;
+  transition: color var(--t), background var(--t), border-color var(--t);
 }
 .team-leader-row:last-child { border-bottom: 0; }
+.team-leader-row:hover { color: var(--rose-deep); background: var(--rose-soft); border-left-color: var(--rose-deep); }
 .team-leader-player { min-width: 0; }
-.team-leader-player > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-leader-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-leader-player .meter { display: block; margin-top: 5px; }
+.team-leader-row:hover .meter-fill { background: var(--rose-deep); }
 .team-leader-row b { font-size: 12px; font-weight: 600; }
 
 .team-match-list { border-top: 1px solid var(--hairline); }
@@ -1387,11 +1394,14 @@ button.back-link { padding: 0; border: 0; background: none; }
   grid-template-columns: 24px minmax(0, 1fr) 20px;
   align-items: baseline;
   gap: 7px;
-  padding: 7px 0;
+  padding: 7px 6px;
   border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
   font-size: 13px;
+  transition: color var(--t), background var(--t), border-color var(--t);
 }
-.team-roster-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-roster-row:hover { color: var(--rose-deep); background: var(--rose-soft); border-left-color: var(--rose-deep); }
+.team-roster-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- 18. footer -------------------------------------------------- */
 .site-foot {

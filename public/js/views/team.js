@@ -1,7 +1,7 @@
 // views/team.js — national team profile and 2026 World Cup dashboard.
 import { fetchJSON } from '../api.js';
 import { esc, fmtDate, fmtTime, resultChip } from '../format.js';
-import { errorState, meter, playerLink, safeUrl } from './_shared.js';
+import { errorState, meter, safeUrl } from './_shared.js';
 
 const SNAPSHOT = [
   ['played', 'Matches'], ['wins', 'Wins'], ['draws', 'Draws'], ['losses', 'Losses'],
@@ -127,12 +127,17 @@ function leaderCard(category) {
   const max = Math.max(...category.leaders.map(leader => Number(leader.value) || 0), 1);
   return `<section class="team-leader-card card">
     <div class="team-leader-head"><h4>${esc(category.label || category.key)}</h4><span class="micro muted">Top ${esc(category.leaders.length)}</span></div>
-    <div>${category.leaders.map((leader, index) => `<div class="team-leader-row">
-      <span class="mono muted">${index + 1}</span>
-      <div class="team-leader-player"><div>${playerLink(leader.athleteId, leader.name)}</div>${meter((Number(leader.value) || 0) / max * 100, index === 0)}</div>
-      <b class="mono">${esc(leader.displayValue ?? leader.value ?? '')}</b>
-    </div>`).join('')}</div>
+    <div>${category.leaders.map((leader, index) => leaderRow(leader, index, max)).join('')}</div>
   </section>`;
+}
+
+function leaderRow(leader, index, max) {
+  const content = `<span class="mono muted">${index + 1}</span>
+    <div class="team-leader-player"><span class="team-leader-name">${esc(leader.name || 'Unknown player')}</span>${meter((Number(leader.value) || 0) / max * 100, index === 0)}</div>
+    <b class="mono">${esc(leader.displayValue ?? leader.value ?? '')}</b>`;
+  return leader.athleteId != null
+    ? `<a class="team-leader-row" href="#/player/${encodeURIComponent(leader.athleteId)}">${content}</a>`
+    : `<div class="team-leader-row">${content}</div>`;
 }
 
 function teamMatch(match) {
@@ -191,8 +196,15 @@ function rosterPanel(roster) {
   const order = [...POSITION_ORDER, 'Other'];
   return `<div class="team-roster">${order.filter(key => groups.has(key)).map(key => `<section>
     <h4 class="micro muted">${esc(POSITION_LABELS[key] || 'Squad')}</h4>
-    ${groups.get(key).map(player => `<div class="team-roster-row"><span class="mono muted">${esc(player.jersey ?? '·')}</span>${playerLink(player.id, player.name || '', 'team-roster-name')}<span class="micro muted">${esc(player.positionAbbr || '')}</span></div>`).join('')}
+    ${groups.get(key).map(rosterRow).join('')}
   </section>`).join('')}</div>`;
+}
+
+function rosterRow(player) {
+  const content = `<span class="mono muted">${esc(player.jersey ?? '·')}</span><span class="team-roster-name">${esc(player.name || 'Unknown player')}</span><span class="micro muted">${esc(player.positionAbbr || '')}</span>`;
+  return player.id != null
+    ? `<a class="team-roster-row" href="#/player/${encodeURIComponent(player.id)}">${content}</a>`
+    : `<div class="team-roster-row">${content}</div>`;
 }
 
 function teamSkeleton() {
