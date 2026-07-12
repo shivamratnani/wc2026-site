@@ -91,11 +91,22 @@ export function panelHead(title, extra) {
 
 // odds cell: current american price in mono + open->current movement arrow.
 export function oddsCell(open, current) {
-  const val = americanOdds(current);
+  const shown = current || open;
+  if (!hasOddsPrice(shown)) return '';
+  const val = americanOdds(shown);
   const m = movementArrow(open, current);
   const arrow = m.arrow ? `<span class="mv mv-${m.dir}" aria-hidden="true">${m.arrow}</span>` : '';
   const empty = val === '—' ? ' is-empty' : '';
   return `<span class="odds${empty}"><span class="mono odds-val">${esc(val)}</span>${arrow}</span>`;
+}
+
+export function hasOddsPrice(pair) {
+  if (!pair) return false;
+  if (Object.prototype.hasOwnProperty.call(pair, 'open') || Object.prototype.hasOwnProperty.call(pair, 'current')) {
+    return hasOddsPrice(pair.current) || hasOddsPrice(pair.open);
+  }
+  if (typeof pair === 'object') return pair.american != null || pair.decimal != null;
+  return String(pair).trim() !== '';
 }
 
 // two-sided proportional bar (home vs away share).

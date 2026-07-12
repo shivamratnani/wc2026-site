@@ -76,13 +76,14 @@ const idFromRef = (ref) => {
 };
 
 // Normalize an ESPN odds price node -> { american, decimal } (or null).
-const priceOf = (node) =>
-  node
-    ? {
-        american: node.american ?? node.alternateDisplayValue ?? null,
-        decimal: node.decimal ?? node.value ?? null,
-      }
-    : null;
+const priceOf = node => {
+  if (!node) return null;
+  const american = node.american ?? node.alternateDisplayValue ?? null;
+  const decimal = node.decimal ?? node.value ?? null;
+  return american == null && decimal == null ? null : { american, decimal };
+};
+
+const pricedPair = (open, current) => (open || current ? { open, current } : null);
 
 // Normalize an athlete object (CORE resolver or SITE roster) to a common shape.
 // teamId comes from a CORE $ref; teamAbbr is supplied by roster context.
@@ -225,6 +226,13 @@ async function apiMarkets(env, ctx) {
     payload = JSON.parse(s);
   } catch (e) {
     return json({ configured: true, error: 'parse failed', raw: text.slice(0, 200) }, 60, 502);
+  }
+  for (const key of ['winnerOdds', 'bootOdds']) {
+    const rows = Array.isArray(payload[key])
+      ? payload[key].filter(row => row && String(row.t || '').trim() && row.o != null && String(row.o).trim())
+      : [];
+    if (rows.length) payload[key] = rows;
+    else delete payload[key];
   }
   const res = json({ configured: true, updatedAt: new Date().toISOString(), ...payload }, 900);
   ctx.waitUntil(cache.put(cacheKey, res.clone()));
@@ -499,20 +507,20 @@ async function apiOdds(id) {
       ? { american: (n > 0 ? '+' : '') + n, decimal: +(n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n)).toFixed(2) }
       : null;
   const mlPrice = n => (n && typeof n === 'object' ? priceOf(n) : flatMl(n));
-  const ml = o => ({
-    open: mlPrice(o.open?.moneyLine),
-    current: mlPrice(o.current?.moneyLine) ?? flatMl(o.moneyLine),
-  });
+  const ml = o => pricedPair(
+    mlPrice(o.open?.moneyLine),
+    mlPrice(o.current?.moneyLine) ?? flatMl(o.moneyLine)
+  );
   const moneyline = { home: ml(hto), draw: ml(dro), away: ml(ato) };
   const spread = {
     line: hto.current?.pointSpread?.american ?? hto.current?.pointSpread?.alternateDisplayValue ?? null,
-    home: { open: priceOf(hto.open?.spread), current: priceOf(hto.current?.spread) },
-    away: { open: priceOf(ato.open?.spread), current: priceOf(ato.current?.spread) },
+    home: pricedPair(priceOf(hto.open?.spread), priceOf(hto.current?.spread)),
+    away: pricedPair(priceOf(ato.open?.spread), priceOf(ato.current?.spread)),
   };
   const total = {
     line: it.overUnder ?? null,
-    over: { open: priceOf(it.open?.over), current: priceOf(it.current?.over) },
-    under: { open: priceOf(it.open?.under), current: priceOf(it.current?.under) },
+    over: pricedPair(priceOf(it.open?.over), priceOf(it.current?.over)),
+    under: pricedPair(priceOf(it.open?.under), priceOf(it.current?.under)),
   };
 
   return json(
@@ -572,10 +580,14 @@ async function apiProps(id) {
   // Group entries by prop type.
   const items = propsD.items || [];
   const groups = new Map();
+  let count = 0;
   for (const it of items) {
     const typeName = it.type?.name || 'Other';
     const aid = idFromRef(it.athlete?.$ref);
     const info = byId[aid] || {};
+    const over = pricedPair(priceOf(it.open?.over), priceOf(it.current?.over));
+    const under = pricedPair(priceOf(it.open?.under), priceOf(it.current?.under));
+    if (!over && !under) continue;
     const entry = {
       athleteId: aid,
       name: info.name || ('Unknown #' + aid),
@@ -583,11 +595,12 @@ async function apiProps(id) {
       pos: info.pos ?? null,
       teamAbbr: info.teamAbbr ?? null,
       line: it.current?.total?.value ?? null,
-      over: { open: priceOf(it.open?.over), current: priceOf(it.current?.over) },
-      under: { open: priceOf(it.open?.under), current: priceOf(it.current?.under) },
+      over,
+      under,
     };
     if (!groups.has(typeName)) groups.set(typeName, []);
     groups.get(typeName).push(entry);
+    count++;
   }
 
   // Sort entries within a type by current over decimal ascending (favorites first).
@@ -609,7 +622,7 @@ async function apiProps(id) {
     })
     .map(([type, entries]) => ({ type, entries }));
 
-  return json({ updatedAt: new Date().toISOString(), count: items.length, types }, 60);
+  return json({ updatedAt: new Date().toISOString(), count, types }, 60);
 }
 
 // ============================================================================

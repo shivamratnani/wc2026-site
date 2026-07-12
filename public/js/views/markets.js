@@ -2,7 +2,7 @@
 // tournament futures (live or a static July-7 snapshot fallback).
 import { fetchJSON, Poller } from '../api.js';
 import { esc, fmtDateTime, impliedPct, pct01 } from '../format.js';
-import { skeletonRows, errorState, emptyState, oddsCell, liveDot, meter, safeUrl, sep, inlineNote } from './_shared.js';
+import { skeletonRows, errorState, emptyState, oddsCell, hasOddsPrice, liveDot, meter, safeUrl, sep, inlineNote } from './_shared.js';
 
 // Snapshot carried over from v1 — shown when /api/markets is unconfigured.
 const FALLBACK_MARKETS = {
@@ -67,8 +67,19 @@ export function mount(root) {
   }
 
   function renderLines(fixtures, odds) {
-    const rows = fixtures.map((f, i) => {
-      const o = odds[i] || {};
+    const priced = fixtures.map((fixture, index) => ({ fixture, odds: odds[index] || {} }))
+      .filter(({ odds: o }) => {
+        const ml = o.moneyline || {};
+        const sp = o.spread || {};
+        const tot = o.total || {};
+        return [ml.home, ml.draw, ml.away, sp.home, sp.away, tot.over, tot.under].some(hasOddsPrice);
+      });
+    if (!priced.length) {
+      emptyState(linesEl, { title: 'No priced match lines' });
+      return;
+    }
+
+    const rows = priced.map(({ fixture: f, odds: o }) => {
       const ml = o.moneyline || {};
       const sp = o.spread || {};
       const tot = o.total || {};
@@ -80,7 +91,7 @@ export function mount(root) {
         <td class="r">${oddsCell(ml.draw && ml.draw.open, ml.draw && ml.draw.current)}</td>
         <td class="r">${oddsCell(ml.away && ml.away.open, ml.away && ml.away.current)}</td>
         <td class="r">${sp.line != null ? `<span class="mono spread-line">${esc(sp.line)}</span> ` : ''}${oddsCell(sp.home && sp.home.open, sp.home && sp.home.current)}</td>
-        <td class="r mono">${tot.line != null ? 'O/U ' + esc(tot.line) : '—'}</td>
+        <td class="r mono">${tot.line != null && (hasOddsPrice(tot.over) || hasOddsPrice(tot.under)) ? 'O/U ' + esc(tot.line) : ''}</td>
       </tr>`;
     }).join('');
     linesEl.innerHTML = `<div class="tbl-scroll"><table class="tbl lines"><thead><tr>
@@ -98,7 +109,7 @@ export function mount(root) {
       if (!predEl.querySelector('.pred-card')) predEl.innerHTML = inlineNote('Prediction markets connecting soon.');
       return;
     }
-    const markets = (data && data.markets) || [];
+    const markets = ((data && data.markets) || []).filter(m => (m.outcomes || []).some(validPrediction));
     if (!markets.length || !data.source) {
       predEl.innerHTML = inlineNote('Prediction markets connecting soon.');
       return;
@@ -126,7 +137,8 @@ export function mount(root) {
     const note = m.messiNote
       ? `<div class="mk-note"><span class="mk-note-k micro">Messi watch</span> ${esc(m.messiNote)}</div>`
       : '';
-    futEl.innerHTML = `<div class="grid grid-2">${winner}${boot}</div>${note}`;
+    const tables = winner + boot;
+    futEl.innerHTML = tables ? `<div class="grid grid-2">${tables}</div>${note}` : inlineNote('No futures posted.');
   }
 
   async function loadAll() {
@@ -140,7 +152,9 @@ export function mount(root) {
 }
 
 function predCard(m) {
-  const outs = (m.outcomes || []).slice(0, 6);
+  const outs = (m.outcomes || [])
+    .filter(validPrediction)
+    .slice(0, 6);
   const rows = outs.map((o) => `<div class="pred-row">
     <div class="pr-top"><span class="pr-name">${esc(o.name || '')}</span><span class="pr-pct mono">${pct01(o.prob, 0)}</span></div>
     ${meter((Math.max(0, Math.min(1, Number(o.prob) || 0))) * 100)}
@@ -156,8 +170,14 @@ function predCard(m) {
   </div>`;
 }
 
+function validPrediction(outcome) {
+  return !!outcome && String(outcome.name || '').trim() && Number.isFinite(Number(outcome.prob)) && Number(outcome.prob) > 0;
+}
+
 function oddsTable(title, col, list) {
-  const rows = list.map((r) => {
+  const valid = list.filter(r => r && String(r.t || '').trim() && r.o != null && String(r.o).trim() && impliedPct(r.o) != null);
+  if (!valid.length) return '';
+  const rows = valid.map((r) => {
     const p = impliedPct(r.o);
     return `<tr>
       <td class="l">${esc(r.t)}</td>

@@ -1,7 +1,7 @@
 // views/match.js — single match detail. Sections fail independently.
 import { fetchJSON, Poller, getAliveMaps, isDead } from '../api.js';
 import { esc, fmtDateTime, minuteBadge, resultChip } from '../format.js';
-import { panelHead, oddsCell, twoSidedBar, inlineNote, liveDot } from './_shared.js';
+import { panelHead, oddsCell, hasOddsPrice, twoSidedBar, inlineNote, liveDot } from './_shared.js';
 
 const PLAYER_COLS = [
   { k: 'goals', l: 'G' },
@@ -331,33 +331,32 @@ function oddsCard(o) {
   const sp = o.spread || {};
   const tot = o.total || {};
 
-  const row = (label, leaf, lineVal) => `<div class="oc-row">
-    <span class="oc-label micro">${esc(label)}</span>
-    <span class="oc-line mono">${lineVal != null ? esc(lineVal) : ''}</span>
-    ${oddsCell(leaf && leaf.open, leaf && leaf.current)}
-  </div>`;
+  const row = (label, leaf, lineVal) => hasOddsPrice(leaf) ? `<div class="oc-row">
+      <span class="oc-label micro">${esc(label)}</span>
+      <span class="oc-line mono">${lineVal != null ? esc(lineVal) : ''}</span>
+      ${oddsCell(leaf && leaf.open, leaf && leaf.current)}
+    </div>` : '';
 
   const groups = [];
-  if (ml.home || ml.draw || ml.away) {
+  const mlRows = row('Home', ml.home) + row('Draw', ml.draw) + row('Away', ml.away);
+  if (mlRows) {
     groups.push(`<div class="oc-group">
       <div class="oc-gtitle micro muted">Moneyline</div>
-      ${row('Home', ml.home)}
-      ${ml.draw ? row('Draw', ml.draw) : ''}
-      ${row('Away', ml.away)}
+      ${mlRows}
     </div>`);
   }
-  if (sp.home || sp.away) {
+  const spreadRows = row('Home', sp.home, sp.line) + row('Away', sp.away, sp.line != null ? negate(sp.line) : null);
+  if (spreadRows) {
     groups.push(`<div class="oc-group">
       <div class="oc-gtitle micro muted">Spread</div>
-      ${row('Home', sp.home, sp.line)}
-      ${row('Away', sp.away, sp.line != null ? negate(sp.line) : null)}
+      ${spreadRows}
     </div>`);
   }
-  if (tot.over || tot.under) {
+  const totalRows = row('Over', tot.over, tot.line) + row('Under', tot.under, tot.line);
+  if (totalRows) {
     groups.push(`<div class="oc-group">
       <div class="oc-gtitle micro muted">Total</div>
-      ${row('Over', tot.over, tot.line)}
-      ${row('Under', tot.under, tot.line)}
+      ${totalRows}
     </div>`);
   }
 
@@ -390,19 +389,24 @@ function isGoalType(t) {
 function propRow(e) {
   const over = e.over || {};
   const under = e.under || {};
+  const side = (label, pair) => hasOddsPrice(pair)
+    ? `<span class="prop-ou"><span class="prop-ou-k micro">${label}</span>${oddsCell(pair.open, pair.current)}</span>`
+    : '<span aria-hidden="true"></span>';
   return `<div class="prop-row">
     <span class="prop-name">${esc(e.name || '')}${e.teamAbbr ? ` <span class="micro muted mono">${esc(e.teamAbbr)}</span>` : ''}</span>
     <span class="prop-line mono">${e.line != null ? esc(e.line) : ''}</span>
-    <span class="prop-ou"><span class="prop-ou-k micro">O</span>${oddsCell(over.open, over.current)}</span>
-    <span class="prop-ou"><span class="prop-ou-k micro">U</span>${oddsCell(under.open, under.current)}</span>
+    ${side('O', over)}
+    ${side('U', under)}
   </div>`;
 }
 
 function mountProps(root, data) {
-  const types = (data.types || []).slice();
+  const types = (data.types || [])
+    .map(t => ({ ...t, entries: (t.entries || []).filter(e => hasOddsPrice(e.over) || hasOddsPrice(e.under)) }))
+    .filter(t => t.entries.length);
   types.sort((a, b) => (isGoalType(b.type) ? 1 : 0) - (isGoalType(a.type) ? 1 : 0));
 
-  const total = data.count != null ? data.count : types.reduce((s, t) => s + (t.entries || []).length, 0);
+  const total = types.reduce((s, t) => s + t.entries.length, 0);
   let activeType = 'all';
   let query = '';
   const expanded = new Set();
