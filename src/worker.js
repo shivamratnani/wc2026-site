@@ -683,6 +683,30 @@ async function apiAthletes(idsParam) {
 // GET /api/player?id=ID — player profile + 2026 World Cup statistics
 // ============================================================================
 
+async function wikipediaPlayerPhoto(name) {
+  if (!name) return null;
+  try {
+    const title = encodeURIComponent(name.replace(/\s+/g, ' ').trim());
+    const data = await fetchJSON(
+      `https://en.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=pageimages%7Cdescription&piprop=thumbnail&pithumbsize=500&titles=${title}`,
+      604800,
+      { 'User-Agent': 'WC26/1.0 (https://wc2026.ratnani.org)', Accept: 'application/json' },
+    );
+    const page = Object.values(data.query?.pages || {})[0];
+    if (!page || page.missing != null || !page.thumbnail?.source) return null;
+    const description = String(page.description || '').toLowerCase();
+    if (!/(footballer|soccer player)/.test(description)) {
+      return null;
+    }
+    return {
+      url: page.thumbnail.source,
+      sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function apiPlayer(id) {
   if (!id) return json({ error: 'missing id' }, 10, 400);
   if (!/^\d+$/.test(String(id))) return json({ error: 'invalid id' }, 10, 400);
@@ -694,9 +718,10 @@ async function apiPlayer(id) {
 
   const teamId = idFromRef(athlete.team?.$ref);
   const clubId = idFromRef(athlete.defaultTeam?.$ref);
-  const [team, club] = await Promise.all([
+  const [team, club, fallbackPhoto] = await Promise.all([
     teamId ? fetchJSON(`${CORE}/seasons/2026/teams/${teamId}`, 86400).catch(() => null) : null,
     clubId ? fetchJSON(`https://sports.core.api.espn.com/v2/sports/soccer/teams/${clubId}`, 86400).catch(() => null) : null,
+    athlete.headshot?.href ? null : wikipediaPlayerPhoto(athlete.displayName ?? athlete.fullName),
   ]);
 
   const stats = {};
@@ -728,7 +753,8 @@ async function apiPlayer(id) {
       name: athlete.displayName ?? athlete.fullName ?? null,
       fullName: athlete.fullName ?? athlete.displayName ?? null,
       shortName: athlete.shortName ?? null,
-      headshot: athlete.headshot?.href ?? null,
+      headshot: athlete.headshot?.href ?? fallbackPhoto?.url ?? null,
+      photoSource: fallbackPhoto?.sourceUrl ? { name: 'Wikimedia', url: fallbackPhoto.sourceUrl } : null,
       flag: athlete.flag?.href ?? null,
       position: athlete.position?.displayName ?? athlete.position?.name ?? null,
       positionAbbr: athlete.position?.abbreviation ?? null,
