@@ -6,6 +6,7 @@
 //
 // Endpoints:
 //   GET /api/live               compact match list (scores, live status, odds)
+//   GET /api/bracket            knockout bracket from round of 32 through final
 //   GET /api/stats              golden boot + assists leaders (from statistics)
 //   GET /api/standings          group tables
 //   GET /api/match?id=EVENTID   full match detail (lineups, timeline, stats, form, h2h)
@@ -264,6 +265,72 @@ async function apiStandings() {
     return { name: ch.name ?? null, entries };
   });
   return json({ updatedAt: new Date().toISOString(), groups }, 300);
+}
+
+// ============================================================================
+// GET /api/bracket — complete knockout bracket (SITE scoreboard)
+// ============================================================================
+
+const BRACKET_DATES = '20260628-20260719';
+const BRACKET_ROUNDS = [
+  ['round-of-32', 'Round of 32'],
+  ['round-of-16', 'Round of 16'],
+  ['quarterfinals', 'Quarterfinals'],
+  ['semifinals', 'Semifinals'],
+  ['final', 'Final'],
+];
+
+async function apiBracket() {
+  const d = await fetchJSON(`${SITE}/scoreboard?dates=${BRACKET_DATES}&limit=100`, 60);
+  const allowed = new Set([...BRACKET_ROUNDS.map(([key]) => key), '3rd-place-match']);
+
+  const matches = (d.events || []).map(e => {
+    const c = (e.competitions || [])[0] || {};
+    const stage = e.season?.slug || '';
+    if (!allowed.has(stage)) return null;
+
+    const side = homeAway => {
+      const competitor = (c.competitors || []).find(x => x.homeAway === homeAway) || {};
+      const team = competitor.team || {};
+      return {
+        teamId: team.id ?? null,
+        team: team.displayName || 'TBD',
+        abbr: team.abbreviation || '',
+        logo: team.logo || null,
+        score: competitor.score ?? null,
+        winner: !!competitor.winner,
+        pens: competitor.shootoutScore ?? null,
+      };
+    };
+
+    return {
+      id: e.id,
+      date: e.date,
+      stage,
+      state: e.status?.type?.state || '',
+      status: e.status?.type?.description || '',
+      detail: e.status?.type?.detail || '',
+      clock: e.status?.displayClock || '',
+      note: c.notes?.[0]?.headline || null,
+      venue: c.venue?.fullName || '',
+      home: side('home'),
+      away: side('away'),
+    };
+  }).filter(Boolean).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const rounds = BRACKET_ROUNDS.map(([key, label]) => ({
+    key,
+    label,
+    matches: matches.filter(m => m.stage === key),
+  }));
+  const anyLive = matches.some(m => m.state === 'in');
+
+  return json({
+    updatedAt: new Date().toISOString(),
+    anyLive,
+    rounds,
+    thirdPlace: matches.find(m => m.stage === '3rd-place-match') || null,
+  }, anyLive ? 15 : 300);
 }
 
 // ============================================================================
@@ -751,6 +818,7 @@ async function apiPredictions(debug) {
 
 const routes = {
   '/api/live': () => apiLive(),
+  '/api/bracket': () => apiBracket(),
   '/api/stats': () => apiStats(),
   '/api/standings': () => apiStandings(),
   '/api/match': p => apiMatch(p.get('id')),

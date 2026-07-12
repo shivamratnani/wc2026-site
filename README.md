@@ -1,7 +1,7 @@
 # wc2026.ratnani.org — World Cup 2026 live board
 
-A single-page live board for World Cup 2026: real-time scores, tournament stats,
-standings, DraftKings odds and player props, and prediction-market lines. Data
+A single-page live board for World Cup 2026: real-time scores, the knockout bracket,
+tournament stats, standings, DraftKings odds and player props, and prediction-market lines. Data
 comes from ESPN's public JSON feeds (no API key), proxied and cached at the edge.
 
 ## Architecture
@@ -13,6 +13,7 @@ directly and repeat reads are essentially free. There is no build step.
 
 - `src/worker.js` — edge API:
   - `GET /api/live`    scores + status + DraftKings odds; 15s cache when a match is live, 60s idle
+  - `GET /api/bracket` complete knockout bracket; 15s cache when a match is live, 5 min idle
   - `GET /api/stats`   goals/assists leaders; 5 min cache
   - `GET /api/markets` optional futures/props via Anthropic web search; 15 min cache
 - `public/` — static frontend; polls `/api/live` during matches, backs off when idle,
