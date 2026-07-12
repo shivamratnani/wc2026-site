@@ -2,7 +2,7 @@
 // from /api/stats; other categories resolve athlete names via /api/athletes.
 import { fetchJSON, resolveAthletes, getAliveMaps, isDead, lookupTeam } from '../api.js';
 import { esc } from '../format.js';
-import { errorState, emptyState, meter, playerLink } from './_shared.js';
+import { errorState, emptyState, meter } from './_shared.js';
 
 export function mount(root) {
   root.innerHTML = `<div class="view view-leaders"><div class="wrap">
@@ -91,14 +91,17 @@ function board(title, list, unit, alive) {
     const dead = isDead(alive, { abbr: x.team, name: x.team });
     const m = x.matches != null ? ` · ${esc(x.matches)} ${Number(x.matches) === 1 ? 'match' : 'matches'}` : '';
     const out = dead ? ' · <span class="out-mark">out</span>' : '';
-    return `<div class="board-row${dead ? ' row-out' : ''}">
+    const content = `
       <span class="br-rank mono">${i + 1}</span>
       <div class="br-main">
-        <div class="br-top">${playerLink(x.athleteId, x.name || '', 'br-name')}<span class="br-val mono">${esc(x.val)}</span></div>
+        <div class="br-top"><span class="br-name">${esc(x.name || '')}</span><span class="br-val mono">${esc(x.val)}</span></div>
         <div class="br-meta micro muted">${esc(x.team || '')}${m}${out}</div>
         ${meter((Number(x.val) || 0) / max * 100, i === 0)}
-      </div>
-    </div>`;
+      </div>`;
+    const cls = `board-row${dead ? ' row-out' : ''}`;
+    return x.athleteId != null
+      ? `<a class="${cls}" href="#/player/${encodeURIComponent(x.athleteId)}">${content}</a>`
+      : `<div class="${cls}">${content}</div>`;
   }).join('');
   return `<div class="board card">
     <div class="board-title">${esc(title)}<span class="board-unit micro muted">${esc(unit || '')}</span></div>
@@ -120,11 +123,15 @@ function catCard(c, names, alive) {
       const abbr = team && team.abbr ? `<span class="cr-abbr micro muted">${esc(team.abbr)}</span>` : '';
       out = `${abbr}<span class="out-mark">out</span>`;
     }
-    return `<div class="cat-row${dead ? ' row-out' : ''}">
+    const content = `
       <span class="cr-rank mono">${i + 1}</span>
-      <span class="cr-name">${playerLink(l.athleteId, nm, 'cr-player')}${out}</span>
+      <span class="cr-name"><span class="cr-player">${esc(nm)}</span>${out}</span>
       <span class="cr-val mono">${esc(val)}</span>
-    </div>`;
+    `;
+    const cls = `cat-row${dead ? ' row-out' : ''}`;
+    return l.athleteId != null
+      ? `<a class="${cls}" href="#/player/${encodeURIComponent(l.athleteId)}">${content}</a>`
+      : `<div class="${cls}">${content}</div>`;
   }).join('');
   return `<div class="cat-card card">
     <div class="cat-title micro">${esc(c.label || c.key || '')}</div>
