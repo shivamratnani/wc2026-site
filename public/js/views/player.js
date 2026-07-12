@@ -100,10 +100,7 @@ function render(root, data) {
 
 function playerImage(player) {
   if (player.headshot) {
-    const credit = player.photoSource?.url
-      ? `<a class="player-photo-credit micro" href="${esc(safeUrl(player.photoSource.url))}" target="_blank" rel="noopener">${esc(player.photoSource.name || 'Photo source')} ↗</a>`
-      : '';
-    return `<img class="player-photo" src="${esc(safeUrl(player.headshot))}" alt="${esc(player.name || 'Player')}" width="180" height="180">${credit}`;
+    return `<img class="player-photo" src="${esc(safeUrl(player.headshot))}" alt="${esc(player.name || 'Player')}" width="180" height="180">`;
   }
   const initials = String(player.name || '?').split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join('');
   return `<div class="player-photo player-initials" aria-hidden="true">${esc(initials)}</div>`;
