@@ -3,7 +3,7 @@
    Sections: 1 tokens · 2 reset/base · 3 nav · 4 layout · 5 utilities
    6 states/skeletons · 7 cards+tags · 8 tables · 9 odds/meters
    10 matches · 11 match detail · 12 groups · 13 leaders · 14 markets
-   15 bracket · 16 player · 17 team · 18 footer · 19 responsive · 20 print
+   15 bracket · 16 player · 17 team · 18 club · 19 footer · 20 responsive · 21 print
    ================================================================= */
 
 /* ---- 1. tokens --------------------------------------------------- */
@@ -342,11 +342,11 @@ input { font: inherit; }
   transition: border-color var(--t);
 }
 .link-btn:hover { border-color: var(--rose-deep); }
-.player-link, .team-link {
+.player-link, .team-link, .club-link {
   border-bottom: 1px solid transparent;
   transition: color var(--t), border-color var(--t);
 }
-.player-link:hover, .team-link:hover { color: var(--rose-deep); border-color: var(--rose-deep); }
+.player-link:hover, .team-link:hover, .club-link:hover { color: var(--rose-deep); border-color: var(--rose-deep); }
 
 /* ---- 6. states + skeletons --------------------------------------- */
 .state {
@@ -1189,9 +1189,9 @@ button.back-link { padding: 0; border: 0; background: none; }
 .player-team > span, .player-team > a { display: flex; align-items: center; gap: 8px; }
 .player-team img { width: 22px; height: 22px; object-fit: contain; background: var(--logo-chip); border-radius: 2px; }
 .player-team b { font-size: 14px; font-weight: 600; }
-.player-team > a.team-link { border-bottom: 0; }
-.player-team > a.team-link b { border-bottom: 1px solid transparent; transition: border-color var(--t); }
-.player-team > a.team-link:hover b { border-color: var(--rose-deep); }
+.player-team > a.team-link, .player-team > a.club-link { border-bottom: 0; }
+.player-team > a.team-link b, .player-team > a.club-link b { border-bottom: 1px solid transparent; transition: border-color var(--t); }
+.player-team > a.team-link:hover b, .player-team > a.club-link:hover b { border-color: var(--rose-deep); }
 
 .player-snapshot {
   display: grid;
@@ -1410,7 +1410,135 @@ button.back-link { padding: 0; border: 0; background: none; }
 .team-roster-row:hover { color: var(--rose-deep); background: var(--rose-soft); border-left-color: var(--rose-deep); }
 .team-roster-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- 18. footer -------------------------------------------------- */
+/* ---- 18. club profile -------------------------------------------- */
+.club-hero {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 30px;
+  margin-top: 24px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--hairline);
+}
+.club-crest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  height: 150px;
+  padding: 18px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  background: var(--paper);
+}
+.club-crest img { width: 100%; height: 100%; object-fit: contain; }
+.club-crest-fallback { color: var(--rose-deep); font-size: 30px; font-weight: 600; }
+.club-intro { min-width: 0; }
+.club-page-name {
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+.club-summary { margin-top: 20px; color: var(--ink-muted); font-size: 14px; }
+.club-summary b { color: var(--ink); font-weight: 600; }
+.club-snapshot {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  margin: 28px 0 34px;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.club-snapshot-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 14px 12px;
+  border-right: 1px solid var(--hairline);
+}
+.club-snapshot-stat:last-child { border-right: none; }
+.club-snapshot-value { color: var(--ink); font-size: 21px; font-weight: 600; }
+.club-snapshot-stat .micro { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.club-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 40px;
+  align-items: start;
+}
+.club-main, .club-side { min-width: 0; }
+.club-section + .club-section { margin-top: 38px; }
+.club-side-section + .club-side-section { margin-top: 34px; }
+.club-leader-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.club-leader-card { padding: 14px; }
+.club-leader-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--hairline);
+}
+.club-leader-head h4 { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.club-leader-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 7px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  font-size: 13px;
+  transition: color var(--t), background var(--t), border-color var(--t);
+}
+.club-leader-row:last-child { border-bottom: 0; }
+.club-leader-row:hover { color: var(--rose-deep); background: var(--rose-soft); border-left-color: var(--rose-deep); }
+.club-leader-player { min-width: 0; }
+.club-leader-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.club-leader-player .meter { margin-top: 5px; }
+.club-leader-row:hover .meter-fill { background: var(--rose-deep); }
+.club-leader-row b { font-size: 12px; font-weight: 600; }
+
+.club-player-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.club-player-table { min-width: 680px; }
+.club-player-head, .club-player-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) 120px 42px 48px 58px 34px 34px;
+  align-items: center;
+  gap: 9px;
+}
+.club-player-head { padding: 0 8px 8px; border-bottom: 1px solid var(--hairline-strong); }
+.club-player-head span:nth-child(n+3) { text-align: right; }
+.club-player-row {
+  min-height: 42px;
+  padding: 8px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  font-size: 13px;
+  transition: color var(--t), background var(--t), border-color var(--t);
+}
+.club-player-row:hover { color: var(--rose-deep); background: var(--rose-soft); border-left-color: var(--rose-deep); }
+.club-player-row > span:nth-child(n+3) { text-align: right; }
+.club-player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.club-player-country { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.club-player-country img { flex: none; width: 20px; height: 14px; object-fit: cover; border: 1px solid var(--hairline); }
+
+.club-country-list { display: flex; flex-direction: column; }
+.club-country-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; padding: 9px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
+.club-country-row > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.club-country-row img { flex: none; width: 22px; height: 15px; object-fit: cover; border: 1px solid var(--hairline); }
+.club-country-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.club-country-row > span:nth-child(2) { text-align: right; }
+.club-country-row > span:nth-child(2) small { font-family: var(--font-text); }
+.club-country-row > small { grid-column: 1 / -1; padding-left: 30px; }
+.club-position-list { display: flex; flex-direction: column; }
+.club-position-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
+.club-position-list b { font-size: 12px; font-weight: 600; }
+
+/* ---- 19. footer -------------------------------------------------- */
 .site-foot {
   border-top: 1px solid var(--hairline);
   margin-top: 20px;
@@ -1426,7 +1554,7 @@ button.back-link { padding: 0; border: 0; background: none; }
 }
 .site-foot b { color: var(--ink); font-weight: 600; }
 
-/* ---- 19. responsive ---------------------------------------------- */
+/* ---- 20. responsive ---------------------------------------------- */
 @media (max-width: 960px) {
   .match-grid { grid-template-columns: 1fr; }
   .match-side { position: static; }
@@ -1439,6 +1567,10 @@ button.back-link { padding: 0; border: 0; background: none; }
   .team-snapshot-stat:nth-child(4) { border-right: none; }
   .team-snapshot-stat:nth-child(-n+4) { border-bottom: 1px solid var(--hairline); }
   .team-layout { grid-template-columns: 1fr; gap: 40px; }
+  .club-snapshot { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .club-snapshot-stat:nth-child(4) { border-right: none; }
+  .club-snapshot-stat:nth-child(-n+4) { border-bottom: 1px solid var(--hairline); }
+  .club-layout { grid-template-columns: 1fr; gap: 40px; }
 }
 @media (max-width: 760px) {
   :root { --pad: 16px; }
@@ -1472,6 +1604,10 @@ button.back-link { padding: 0; border: 0; background: none; }
   .team-page-name { font-size: 30px; }
   .team-leader-grid, .team-stat-groups { grid-template-columns: 1fr; }
   .team-match-row { grid-template-columns: 112px minmax(0, 1fr) 88px; gap: 10px; }
+  .club-hero { grid-template-columns: 110px minmax(0, 1fr); gap: 20px; }
+  .club-crest { width: 110px; height: 110px; padding: 14px; }
+  .club-page-name { font-size: 30px; }
+  .club-leader-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 440px) {
   .grid-cats { grid-template-columns: 1fr; }
@@ -1491,9 +1627,16 @@ button.back-link { padding: 0; border: 0; background: none; }
   .team-match-meta { grid-area: meta; }
   .team-match-opponent { grid-area: opponent; }
   .team-match-score { grid-area: score; }
+  .club-hero { grid-template-columns: 82px minmax(0, 1fr); gap: 14px; }
+  .club-crest { width: 82px; height: 82px; padding: 10px; }
+  .club-page-name { font-size: 27px; }
+  .club-summary { margin-top: 13px; font-size: 12px; }
+  .club-snapshot { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .club-snapshot-stat:nth-child(2n) { border-right: none; }
+  .club-snapshot-stat:nth-child(-n+6) { border-bottom: 1px solid var(--hairline); }
 }
 
-/* ---- 20. print --------------------------------------------------- */
+/* ---- 21. print --------------------------------------------------- */
 @media print {
   .topnav, .status-chip, .btn-retry, .link-btn, .props-search { display: none; }
   body { background: #fff; }

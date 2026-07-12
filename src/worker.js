@@ -16,6 +16,7 @@
 //   GET /api/athletes?ids=1,2   batch athlete resolver (name/jersey/pos/team)
 //   GET /api/player?id=ID       player bio, national team, club, and tournament stats
 //   GET /api/team?id=ID         team profile, standing, schedule, stats, leaders, and squad
+//   GET /api/club?id=ID         club profile and its players' 2026 World Cup performance
 //   GET /api/alive              team life status (advanced from group, not yet knocked out)
 //   GET /api/predictions        prediction markets (Kalshi, Polymarket fallback)
 //   GET /api/markets            Anthropic web-search futures/boot odds
@@ -75,6 +76,11 @@ async function handle(fn) {
 const idFromRef = (ref) => {
   const m = String(ref || '').match(/\/(\d+)(?=\?|$)/);
   return m ? m[1] : null;
+};
+
+const leagueFromRef = (ref) => {
+  const match = String(ref || '').match(/\/leagues\/([^/?]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
 };
 
 // Normalize an ESPN odds price node -> { american, decimal } (or null).
@@ -939,6 +945,92 @@ async function apiTeam(id) {
 }
 
 // ============================================================================
+// GET /api/club?id=ID — club players' 2026 World Cup performance
+// ============================================================================
+
+const CLUB_STAT_KEYS = new Set([
+  'appearances', 'starts', 'minutes', 'totalGoals', 'goalAssists', 'totalShots',
+  'shotsOnTarget', 'shotAssists', 'bigChanceCreated', 'accuratePasses', 'passPct',
+  'effectiveTackles', 'interceptions', 'recoveries', 'saves', 'cleanSheet',
+  'goalsConceded', 'yellowCards',
+]);
+
+async function apiClub(id) {
+  if (!id) return json({ error: 'missing id' }, 10, 400);
+  if (!/^\d+$/.test(String(id))) return json({ error: 'invalid id' }, 10, 400);
+
+  const club = await fetchJSON(`https://sports.core.api.espn.com/v2/sports/soccer/teams/${id}`, 86400);
+  const league = leagueFromRef(club.defaultLeague?.$ref) || leagueFromRef(club.athletes?.$ref);
+  if (!league) return json({ error: 'club league unavailable' }, 300, 404);
+
+  const rosterUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${encodeURIComponent(league)}/teams/${id}/roster`;
+  let rosterData = await fetchJSON(
+    rosterUrl,
+    86400,
+  );
+  if (!(rosterData.athletes || []).length) {
+    rosterData = await fetchJSON(`${rosterUrl}?season=2025`, 86400).catch(() => rosterData);
+  }
+  const roster = (rosterData.athletes || []).slice(0, 45);
+  const players = (await Promise.all(roster.map(async athlete => {
+    const data = await fetchJSON(
+      `${CORE}/seasons/2026/types/1/athletes/${athlete.id}/statistics`,
+      600,
+    ).catch(() => null);
+    if (!data) return null;
+    const allStats = statisticMap(data);
+    if (!(Number(allStats.appearances?.value) > 0)) return null;
+    const stats = {};
+    for (const [key, stat] of Object.entries(allStats)) if (CLUB_STAT_KEYS.has(key)) stats[key] = stat;
+    return {
+      id: athlete.id ?? null,
+      name: athlete.displayName ?? athlete.fullName ?? null,
+      shortName: athlete.shortName ?? null,
+      position: athlete.position?.displayName ?? athlete.position?.name ?? null,
+      positionAbbr: athlete.position?.abbreviation ?? null,
+      country: athlete.citizenship ?? athlete.flag?.alt ?? null,
+      countryFlag: athlete.flag?.href ?? null,
+      headshot: athlete.headshot?.href ?? null,
+      stats,
+    };
+  }))).filter(Boolean);
+
+  const value = (player, key) => Number(player.stats[key]?.value) || 0;
+  players.sort((a, b) =>
+    value(b, 'totalGoals') - value(a, 'totalGoals') ||
+    value(b, 'goalAssists') - value(a, 'goalAssists') ||
+    value(b, 'minutes') - value(a, 'minutes') ||
+    String(a.name).localeCompare(String(b.name))
+  );
+
+  const totals = {
+    players: players.length,
+    countries: new Set(players.map(player => player.country).filter(Boolean)).size,
+  };
+  for (const key of ['appearances', 'starts', 'minutes', 'totalGoals', 'goalAssists', 'saves']) {
+    totals[key] = players.reduce((sum, player) => sum + value(player, key), 0);
+  }
+  const espnUrl = (club.links || []).find(link => (link.rel || []).includes('clubhouse'))?.href ?? null;
+
+  return json({
+    updatedAt: new Date().toISOString(),
+    club: {
+      id: club.id ?? id,
+      name: club.displayName ?? club.name ?? null,
+      shortName: club.shortDisplayName ?? club.displayName ?? null,
+      abbr: club.abbreviation ?? null,
+      logo: club.logos?.[0]?.href ?? null,
+      color: club.color ?? null,
+      alternateColor: club.alternateColor ?? null,
+      league,
+      espnUrl,
+    },
+    totals,
+    players,
+  }, 600);
+}
+
+// ============================================================================
 // GET /api/alive — tournament life status per team
 // Dead = failed to advance from the group, or lost a completed knockout tie.
 // ============================================================================
@@ -1109,6 +1201,7 @@ const routes = {
   '/api/athletes': p => apiAthletes(p.get('ids')),
   '/api/player': p => apiPlayer(p.get('id')),
   '/api/team': p => apiTeam(p.get('id')),
+  '/api/club': p => apiClub(p.get('id')),
   '/api/alive': () => apiAlive(),
   '/api/predictions': p => apiPredictions(p.get('debug')),
   '/api/markets': (p, env, ctx) => apiMarkets(env, ctx),

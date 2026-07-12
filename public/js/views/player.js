@@ -65,8 +65,8 @@ function render(root, data) {
       <div class="micro muted">${esc([data.team?.abbr, player.position].filter(Boolean).join(' · '))}</div>
       <h2 class="player-name">${esc(player.name || 'Unknown player')}</h2>
       <div class="player-affiliations">
-        ${teamLine(data.team, 'World Cup team', true)}
-        ${teamLine(data.club, 'Club')}
+        ${teamLine(data.team, 'World Cup team', 'team')}
+        ${teamLine(data.club, 'Club', 'club', true)}
       </div>
     </div>
   </header>
@@ -106,11 +106,12 @@ function playerImage(player) {
   return `<div class="player-photo player-initials" aria-hidden="true">${esc(initials)}</div>`;
 }
 
-function teamLine(team, label, linkTeam = false) {
-  if (!team) return '';
+function teamLine(team, label, linkType = '', showUnavailable = false) {
+  if (!team) return showUnavailable ? `<div class="player-team"><span><b class="muted">N/A</b></span><small class="micro muted">${esc(label)}</small></div>` : '';
   const logo = team.logo ? `<img src="${esc(safeUrl(team.logo))}" alt="" width="22" height="22">` : '';
   const name = esc(team.name || team.abbr || '');
-  const content = linkTeam && team.id != null ? `<a class="team-link" href="#/team/${encodeURIComponent(team.id)}">${logo}<b>${name}</b></a>` : `<span>${logo}<b>${name}</b></span>`;
+  const href = linkType && team.id != null ? `#/${linkType}/${encodeURIComponent(team.id)}` : '';
+  const content = href ? `<a class="${esc(linkType)}-link" href="${href}">${logo}<b>${name}</b></a>` : `<span>${logo}<b>${name}</b></span>`;
   return `<div class="player-team">${content}<small class="micro muted">${esc(label)}</small></div>`;
 }
 
