@@ -419,13 +419,19 @@ async function apiMatch(id) {
 
   // Timeline: key events.
   const timeline = (d.keyEvents || [])
-    .map(k => ({
-      minute: k.clock?.displayValue ?? null,
-      type: k.type?.text ?? null,
-      text: k.text ?? null,
-      teamId: k.team?.id ?? null,
-      player: (k.participants || k.athletesInvolved)?.[0]?.displayName ?? null,
-    }))
+    .map(k => {
+      const participant = (k.participants || k.athletesInvolved)?.[0] || {};
+      return {
+        minute: k.clock?.displayValue ?? null,
+        type: k.type?.text ?? null,
+        text: k.text ?? null,
+        shortText: k.shortText ?? null,
+        teamId: k.team?.id ?? null,
+        player: participant.athlete?.displayName ?? participant.displayName ?? null,
+        scoringPlay: !!k.scoringPlay,
+        shootout: !!k.shootout,
+      };
+    })
     .filter(ev => ev.text); // some keyEvents carry no description — noise as rows
 
   // Team stats: pair home/away boxscore statistics by name.

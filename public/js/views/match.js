@@ -139,6 +139,7 @@ function renderHeader(d, aliveMaps) {
   const pens = (home.pens != null || away.pens != null)
     ? `<div class="pens-line mono">pens ${esc(home.pens ?? '')}–${esc(away.pens ?? '')}</div>`
     : '';
+  const scorers = showScore ? scorerStrip(d, home.id, away.id) : '';
 
   const venueBits = [h.venue, h.date ? fmtDateTime(h.date) : ''].filter(Boolean).map(esc);
 
@@ -157,6 +158,7 @@ function renderHeader(d, aliveMaps) {
         ${elimNote(away)}
       </div>
     </div>
+    ${scorers}
     ${venueBits.length ? `<div class="mh-venue micro muted">${venueBits.join(' · ')}</div>` : ''}`;
 }
 
@@ -176,6 +178,54 @@ function formStrip(arr) {
     const title = [f.opp, f.score].filter(Boolean).join(' ');
     return `<span class="form-chip form-${c.cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(c.label)}</span>`;
   }).join('');
+}
+
+function scorerStrip(d, homeId, awayId) {
+  const bySide = { home: [], away: [] };
+  for (const event of (d.timeline || [])) {
+    if (!isGoalEvent(event)) continue;
+    const side = String(event.teamId) === String(homeId)
+      ? 'home'
+      : String(event.teamId) === String(awayId) ? 'away' : '';
+    const name = scorerName(event);
+    if (!side || !name) continue;
+    const type = String(event.type || '').toLowerCase();
+    const marker = type.includes('own') ? 'OG' : type.includes('penalty') ? 'P' : '';
+    const key = name + '|' + marker;
+    let scorer = bySide[side].find(item => item.key === key);
+    if (!scorer) {
+      scorer = { key, name, marker, minutes: [] };
+      bySide[side].push(scorer);
+    }
+    scorer.minutes.push(minuteBadge(event.minute));
+  }
+
+  if (!bySide.home.length && !bySide.away.length) return '';
+  return `<div class="mh-scorers" aria-label="Goalscorers">
+    <div class="mh-scorer-side is-home">${bySide.home.map(scorerItem).join('')}</div>
+    <span aria-hidden="true"></span>
+    <div class="mh-scorer-side is-away">${bySide.away.map(scorerItem).join('')}</div>
+  </div>`;
+}
+
+function isGoalEvent(event) {
+  if (event.shootout) return false;
+  if (event.scoringPlay) return true;
+  const type = String(event.type || '').toLowerCase();
+  return type.includes('goal') && !type.includes('disallow') && !type.includes('miss');
+}
+
+function scorerName(event) {
+  if (event.player) return String(event.player).trim();
+  const short = String(event.shortText || '').replace(/\s+(?:own goal|goal).*$/i, '').trim();
+  if (short) return short;
+  const match = String(event.text || '').match(/^[^.]*\.\s+(.+?)\s+\([^)]*\)/);
+  return match ? match[1].trim() : '';
+}
+
+function scorerItem(scorer) {
+  const marker = scorer.marker ? ` <span class="mh-goal-kind">(${esc(scorer.marker)})</span>` : '';
+  return `<span class="mh-scorer"><span>${esc(scorer.name)}</span>${marker} <span class="mono">${scorer.minutes.map(esc).join(', ')}</span></span>`;
 }
 
 // ---- timeline -----------------------------------------------------
@@ -212,11 +262,13 @@ function renderTimeline(d) {
   const rows = tl.map((ev) => {
     const side = ev.teamId != null ? (String(ev.teamId) === String(homeId) ? 'home' : 'away') : '';
     const ic = eventIcon(ev.type);
-    const lead = ev.player ? `<b>${esc(ev.player)}</b>${ev.text ? ' — ' : ''}` : '';
+    const text = String(ev.text || '');
+    const repeatsPlayer = ev.player && text.toLowerCase().includes(String(ev.player).toLowerCase());
+    const lead = ev.player && !repeatsPlayer ? `<b>${esc(ev.player)}</b>${text ? ' — ' : ''}` : '';
     return `<li class="tl-row tl-${side}">
       <span class="tl-min mono">${esc(minuteBadge(ev.minute))}</span>
       <span class="tl-ic ${ic.cls}" aria-hidden="true">${ic.glyph}</span>
-      <span class="tl-txt">${lead}${esc(ev.text || '')}</span>
+      <span class="tl-txt">${lead}${esc(text)}</span>
     </li>`;
   }).join('');
   sec.innerHTML = panelHead('Timeline') + `<ol class="timeline">${rows}</ol>`;
