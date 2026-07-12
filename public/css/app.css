@@ -1540,13 +1540,47 @@ img.player-photo {
 .club-player-country img { flex: none; width: 20px; height: 14px; object-fit: cover; border: 1px solid var(--hairline); }
 
 .club-country-list { display: flex; flex-direction: column; }
-.club-country-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; padding: 9px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
-.club-country-row > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.club-country-row img { flex: none; width: 22px; height: 15px; object-fit: cover; border: 1px solid var(--hairline); }
-.club-country-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.club-country-row > span:nth-child(2) { text-align: right; }
-.club-country-row > span:nth-child(2) small { font-family: var(--font-text); }
-.club-country-row > small { grid-column: 1 / -1; padding-left: 30px; }
+.club-country-item { border-bottom: 1px solid var(--hairline); }
+.club-country-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 7px 0;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.club-country-summary::-webkit-details-marker { display: none; }
+.club-country-summary::after { content: '+'; color: var(--ink-muted); font-family: var(--font-mono); font-size: 14px; text-align: right; }
+.club-country-item[open] > .club-country-summary::after { content: '−'; color: var(--rose-deep); }
+.club-country-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.club-country-name img { flex: none; width: 22px; height: 15px; object-fit: cover; border: 1px solid var(--hairline); }
+.club-country-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.club-country-team-link { border-bottom: 1px solid transparent; transition: color var(--t), border-color var(--t); }
+.club-country-team-link:hover { color: var(--rose-deep); border-color: var(--rose-deep); }
+.club-country-summary > .mono { text-align: right; }
+.club-country-summary > .mono small { font-family: var(--font-text); }
+.club-country-detail { padding: 0 0 9px 30px; }
+.club-country-totals { display: flex; gap: 12px; padding: 2px 5px 6px; }
+.club-country-players { display: flex; flex-direction: column; }
+.club-country-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px 35px 35px;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 5px;
+  border-left: 2px solid transparent;
+  font-size: 12px;
+  transition: color var(--t), background var(--t), border-color var(--t);
+}
+.club-country-player:hover { color: var(--rose-deep); background: var(--rose-soft); border-left-color: var(--rose-deep); }
+.club-country-player > span:first-child { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.club-country-player b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.club-country-player > .mono { text-align: right; white-space: nowrap; }
+.club-country-player > .mono small { color: var(--ink-muted); font-family: var(--font-text); font-size: 9px; }
 .club-position-list { display: flex; flex-direction: column; }
 .club-position-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
 .club-position-list b { font-size: 12px; font-weight: 600; }

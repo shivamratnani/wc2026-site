@@ -1,5 +1,5 @@
 // views/club.js — club-level view of its players' 2026 World Cup output.
-import { fetchJSON } from '../api.js';
+import { fetchJSON, getAliveMaps, lookupTeam } from '../api.js';
 import { esc } from '../format.js';
 import { errorState, meter, safeUrl } from './_shared.js';
 
@@ -32,8 +32,11 @@ export function mount(root, params) {
 
   async function load() {
     try {
-      const data = await fetchJSON('/api/club?id=' + encodeURIComponent(id));
-      if (alive) render(body, data);
+      const [data, teamMaps] = await Promise.all([
+        fetchJSON('/api/club?id=' + encodeURIComponent(id)),
+        getAliveMaps(),
+      ]);
+      if (alive) render(body, data, teamMaps);
     } catch (error) {
       if (alive) errorState(body, { title: 'Club unavailable', note: error.message, onRetry: load });
     }
@@ -43,13 +46,13 @@ export function mount(root, params) {
   return { destroy() { alive = false; } };
 }
 
-function render(root, data) {
+function render(root, data, teamMaps) {
   const club = data.club || {};
   const totals = data.totals || {};
   const players = Array.isArray(data.players) ? data.players : [];
   if (club.name) document.title = 'WC26 · ' + club.name;
   const leaderCards = LEADER_CATEGORIES.map(([key, label]) => leaderCard(key, label, players)).filter(Boolean);
-  const countries = countryGroups(players);
+  const countries = countryGroups(players, teamMaps);
   const positions = positionGroups(players);
   const league = LEAGUE_NAMES[club.league] || club.league || 'Club';
 
@@ -82,7 +85,7 @@ function render(root, data) {
     <aside class="club-side">
       <section class="club-side-section">
         <div class="panel-head"><h3 class="panel-title">Countries represented</h3><span class="micro muted">${esc(countries.length)}</span></div>
-        <div class="club-country-list">${countries.map(countryRow).join('')}</div>
+        <div class="club-country-list">${countries.map(countryDisclosure).join('')}</div>
       </section>
       <section class="club-side-section">
         <div class="panel-head"><h3 class="panel-title">Squad mix</h3></div>
@@ -91,6 +94,10 @@ function render(root, data) {
       ${club.espnUrl ? `<a class="profile-source micro" href="${esc(safeUrl(club.espnUrl))}" target="_blank" rel="noopener">ESPN club page ↗</a>` : ''}
     </aside>
   </div>` : `<div class="state state-empty"><span class="state-mark" aria-hidden="true">—</span><div class="state-title">No World Cup players</div><div class="state-note">No current club player has recorded a 2026 tournament appearance.</div></div>`}`;
+
+  root.querySelectorAll('.club-country-team-link').forEach(link => {
+    link.addEventListener('click', event => event.stopPropagation());
+  });
 }
 
 function value(player, key) {
@@ -140,26 +147,51 @@ function playerTable(players) {
   return `<div class="club-player-scroll" tabindex="0" aria-label="Club players at the World Cup"><div class="club-player-table">${head}${rows}</div></div>`;
 }
 
-function countryGroups(players) {
+function countryGroups(players, teamMaps) {
   const groups = new Map();
   for (const player of players) {
     const key = player.country || 'Unknown';
-    if (!groups.has(key)) groups.set(key, { name: key, flag: player.countryFlag, players: 0, goals: 0, assists: 0 });
+    if (!groups.has(key)) groups.set(key, { name: key, flag: player.countryFlag, players: 0, goals: 0, assists: 0, members: [] });
     const group = groups.get(key);
     group.players += 1;
     group.goals += value(player, 'totalGoals');
     group.assists += value(player, 'goalAssists');
+    group.members.push(player);
+  }
+  for (const group of groups.values()) {
+    const flagAbbr = String(group.flag || '').match(/\/([a-z0-9]+)\.png(?:\?|$)/i)?.[1];
+    const team = lookupTeam(teamMaps, { name: group.name, abbr: flagAbbr });
+    group.teamId = team?.id ?? null;
+    group.members.sort((a, b) => value(b, 'totalGoals') - value(a, 'totalGoals') || value(b, 'goalAssists') - value(a, 'goalAssists') || String(a.name).localeCompare(String(b.name)));
   }
   return [...groups.values()].sort((a, b) => b.players - a.players || b.goals - a.goals || a.name.localeCompare(b.name));
 }
 
-function countryRow(country) {
+function countryDisclosure(country) {
   const playerLabel = country.players === 1 ? 'player' : 'players';
-  return `<div class="club-country-row">
-    <span>${country.flag ? `<img src="${esc(safeUrl(country.flag))}" alt="" width="22" height="15" loading="lazy">` : ''}<b>${esc(country.name)}</b></span>
-    <span class="mono">${esc(country.players)}<small class="muted"> ${playerLabel}</small></span>
-    <small class="muted">${esc(country.goals)} G · ${esc(country.assists)} A</small>
-  </div>`;
+  const name = country.teamId != null
+    ? `<a class="club-country-team-link" href="#/team/${encodeURIComponent(country.teamId)}">${esc(country.name)}</a>`
+    : `<span>${esc(country.name)}</span>`;
+  return `<details class="club-country-item">
+    <summary class="club-country-summary">
+      <span class="club-country-name">${country.flag ? `<img src="${esc(safeUrl(country.flag))}" alt="" width="22" height="15" loading="lazy">` : ''}<b>${name}</b></span>
+      <span class="mono">${esc(country.players)}<small class="muted"> ${playerLabel}</small></span>
+    </summary>
+    <div class="club-country-detail">
+      <div class="club-country-totals micro muted"><span>${esc(country.goals)} goals</span><span>${esc(country.assists)} assists</span></div>
+      <div class="club-country-players">${country.members.map(countryPlayerRow).join('')}</div>
+    </div>
+  </details>`;
+}
+
+function countryPlayerRow(player) {
+  const content = `<span><b>${esc(player.name || 'Unknown player')}</b><small class="micro muted">${esc(player.positionAbbr || '')}</small></span>
+    <span class="mono">${esc(shownValue(player, 'appearances'))}<small> Apps</small></span>
+    <span class="mono">${esc(shownValue(player, 'totalGoals'))}<small> G</small></span>
+    <span class="mono">${esc(shownValue(player, 'goalAssists'))}<small> A</small></span>`;
+  return player.id != null
+    ? `<a class="club-country-player" href="#/player/${encodeURIComponent(player.id)}">${content}</a>`
+    : `<div class="club-country-player">${content}</div>`;
 }
 
 function positionGroups(players) {
